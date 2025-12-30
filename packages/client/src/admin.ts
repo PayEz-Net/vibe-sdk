@@ -2,11 +2,11 @@
  * Admin Client
  *
  * Provides administrative operations for roles, users, and tenant configuration.
+ * Supports both direct API access and IDP proxy mode.
  */
 
 import type {
   VibeAdminClient,
-  VibeClientConfig,
   ListOptions,
   ListResult,
   Role,
@@ -15,19 +15,27 @@ import type {
   User,
   TenantConfig,
 } from './types';
+import type { ResolvedVibeConfig } from './client';
+import { httpRequest, parseResponse } from './http';
 import { VibeError } from './error';
 
 export class AdminClientImpl implements VibeAdminClient {
-  private readonly apiUrl: string;
-  private readonly getAccessToken: () => Promise<string | null>;
-  private readonly debug: boolean;
-  private readonly timeout: number;
+  private readonly config: ResolvedVibeConfig;
 
-  constructor(config: Required<VibeClientConfig>) {
-    this.apiUrl = config.apiUrl;
-    this.getAccessToken = config.getAccessToken;
-    this.debug = config.debug;
-    this.timeout = config.timeout;
+  constructor(config: ResolvedVibeConfig) {
+    this.config = config;
+  }
+
+  /**
+   * Build endpoint path based on mode (direct vs proxy)
+   */
+  private buildEndpoint(path: string): string {
+    if (this.config.useProxy) {
+      // Proxy mode: route through IDP admin endpoints
+      return `/v1/admin${path}`;
+    }
+    // Direct mode
+    return `/v1/admin${path}`;
   }
 
   /**
@@ -41,11 +49,10 @@ export class AdminClientImpl implements VibeAdminClient {
         offset: String(offset),
       });
 
-      const response = await this.fetch(`${this.apiUrl}/v1/admin/roles?${params}`, {
-        method: 'GET',
-      });
+      const endpoint = `${this.buildEndpoint('/roles')}?${params}`;
+      const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+      const body = await parseResponse<{ data: Role[]; meta?: { total?: number } }>(response);
 
-      const body = await this.parseResponse<{ data: Role[]; meta?: { total?: number } }>(response);
       const data = body.data || [];
       const total = body.meta?.total ?? data.length;
 
@@ -57,10 +64,9 @@ export class AdminClientImpl implements VibeAdminClient {
 
     get: async (id: number): Promise<Role | null> => {
       try {
-        const response = await this.fetch(`${this.apiUrl}/v1/admin/roles/${id}`, {
-          method: 'GET',
-        });
-        const body = await this.parseResponse<{ data: Role }>(response);
+        const endpoint = this.buildEndpoint(`/roles/${id}`);
+        const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+        const body = await parseResponse<{ data: Role }>(response);
         return body.data;
       } catch (error) {
         if (error instanceof VibeError && error.code === 'NOT_FOUND') {
@@ -71,27 +77,28 @@ export class AdminClientImpl implements VibeAdminClient {
     },
 
     create: async (data: CreateRole): Promise<Role> => {
-      const response = await this.fetch(`${this.apiUrl}/v1/admin/roles`, {
+      const endpoint = this.buildEndpoint('/roles');
+      const response = await httpRequest(this.config, endpoint, {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: data,
       });
-      const body = await this.parseResponse<{ data: Role }>(response);
+      const body = await parseResponse<{ data: Role }>(response);
       return body.data;
     },
 
     update: async (id: number, data: UpdateRole): Promise<Role> => {
-      const response = await this.fetch(`${this.apiUrl}/v1/admin/roles/${id}`, {
+      const endpoint = this.buildEndpoint(`/roles/${id}`);
+      const response = await httpRequest(this.config, endpoint, {
         method: 'PATCH',
-        body: JSON.stringify(data),
+        body: data,
       });
-      const body = await this.parseResponse<{ data: Role }>(response);
+      const body = await parseResponse<{ data: Role }>(response);
       return body.data;
     },
 
     delete: async (id: number): Promise<void> => {
-      await this.fetch(`${this.apiUrl}/v1/admin/roles/${id}`, {
-        method: 'DELETE',
-      });
+      const endpoint = this.buildEndpoint(`/roles/${id}`);
+      await httpRequest(this.config, endpoint, { method: 'DELETE' });
     },
   };
 
@@ -106,11 +113,10 @@ export class AdminClientImpl implements VibeAdminClient {
         offset: String(offset),
       });
 
-      const response = await this.fetch(`${this.apiUrl}/v1/admin/users?${params}`, {
-        method: 'GET',
-      });
+      const endpoint = `${this.buildEndpoint('/users')}?${params}`;
+      const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+      const body = await parseResponse<{ data: User[]; meta?: { total?: number } }>(response);
 
-      const body = await this.parseResponse<{ data: User[]; meta?: { total?: number } }>(response);
       const data = body.data || [];
       const total = body.meta?.total ?? data.length;
 
@@ -122,10 +128,9 @@ export class AdminClientImpl implements VibeAdminClient {
 
     get: async (id: string): Promise<User | null> => {
       try {
-        const response = await this.fetch(`${this.apiUrl}/v1/admin/users/${id}`, {
-          method: 'GET',
-        });
-        const body = await this.parseResponse<{ data: User }>(response);
+        const endpoint = this.buildEndpoint(`/users/${id}`);
+        const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+        const body = await parseResponse<{ data: User }>(response);
         return body.data;
       } catch (error) {
         if (error instanceof VibeError && error.code === 'NOT_FOUND') {
@@ -136,10 +141,9 @@ export class AdminClientImpl implements VibeAdminClient {
     },
 
     getRoles: async (id: string): Promise<Role[]> => {
-      const response = await this.fetch(`${this.apiUrl}/v1/admin/users/${id}/roles`, {
-        method: 'GET',
-      });
-      const body = await this.parseResponse<{ data: Role[] }>(response);
+      const endpoint = this.buildEndpoint(`/users/${id}/roles`);
+      const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+      const body = await parseResponse<{ data: Role[] }>(response);
       return body.data || [];
     },
   };
@@ -149,74 +153,10 @@ export class AdminClientImpl implements VibeAdminClient {
    */
   tenant = {
     getConfig: async (): Promise<TenantConfig> => {
-      const response = await this.fetch(`${this.apiUrl}/v1/admin/tenant`, {
-        method: 'GET',
-      });
-      const body = await this.parseResponse<{ data: TenantConfig }>(response);
+      const endpoint = this.buildEndpoint('/tenant');
+      const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+      const body = await parseResponse<{ data: TenantConfig }>(response);
       return body.data;
     },
   };
-
-  /**
-   * Internal fetch wrapper with auth and error handling
-   */
-  private async fetch(url: string, options: RequestInit): Promise<Response> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>),
-    };
-
-    const token = await this.getAccessToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-    try {
-      if (this.debug) {
-        console.log(`[vibe:admin] ${options.method} ${url}`);
-      }
-
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      });
-
-      if (this.debug) {
-        console.log(`[vibe:admin] ${response.status} ${response.statusText}`);
-      }
-
-      if (!response.ok) {
-        throw await VibeError.fromResponse(response);
-      }
-
-      return response;
-    } catch (error) {
-      throw VibeError.fromError(error);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  /**
-   * Parse JSON response
-   */
-  private async parseResponse<R>(response: Response): Promise<R> {
-    try {
-      const text = await response.text();
-      if (!text) {
-        return {} as R;
-      }
-      return JSON.parse(text);
-    } catch {
-      throw new VibeError({
-        code: 'SERVER_ERROR',
-        message: 'Invalid JSON response from server',
-        status: response.status,
-      });
-    }
-  }
 }

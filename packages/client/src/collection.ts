@@ -2,24 +2,23 @@
  * Collection Class
  *
  * Provides typed CRUD operations for a Vibe collection.
+ * Supports both direct API access and IDP proxy mode.
  */
 
-import type { Collection, ListOptions, ListResult, VibeClientConfig } from './types';
+import type { Collection, ListOptions, ListResult } from './types';
+import type { ResolvedVibeConfig } from './client';
+import { httpRequest, parseResponse, convertFiltersToVibeFormat } from './http';
 import { VibeError } from './error';
 
 export class CollectionImpl<T> implements Collection<T> {
   private readonly name: string;
-  private readonly apiUrl: string;
-  private readonly getAccessToken: () => Promise<string | null>;
-  private readonly debug: boolean;
-  private readonly timeout: number;
+  private readonly config: ResolvedVibeConfig;
+  private readonly collectionName: string;
 
-  constructor(name: string, config: Required<VibeClientConfig>) {
+  constructor(name: string, config: ResolvedVibeConfig) {
     this.name = name;
-    this.apiUrl = config.apiUrl;
-    this.getAccessToken = config.getAccessToken;
-    this.debug = config.debug;
-    this.timeout = config.timeout;
+    this.config = config;
+    this.collectionName = config.defaultCollection;
   }
 
   /**
@@ -28,6 +27,12 @@ export class CollectionImpl<T> implements Collection<T> {
   async list(options: ListOptions = {}): Promise<ListResult<T>> {
     const { limit = 20, offset = 0, orderBy, orderDir, filter } = options;
 
+    if (this.config.useProxy) {
+      // Proxy mode: use POST query endpoint with filter format
+      return this.listViaQuery(options);
+    }
+
+    // Direct mode: use query string parameters
     const params = new URLSearchParams();
     params.set('limit', String(limit));
     params.set('offset', String(offset));
@@ -45,13 +50,68 @@ export class CollectionImpl<T> implements Collection<T> {
       }
     }
 
-    const url = `${this.apiUrl}/v1/${this.name}?${params.toString()}`;
-    const response = await this.fetch(url, { method: 'GET' });
-    const body = await this.parseResponse<{ data: T[]; meta?: { total?: number } }>(response);
+    const endpoint = `/v1/${this.name}?${params.toString()}`;
+    const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+    const body = await parseResponse<{ data: T[]; meta?: { total?: number } }>(response);
 
-    // Handle various response formats
     const data = Array.isArray(body) ? body : (body.data || []);
     const total = body.meta?.total ?? data.length;
+
+    return {
+      data,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + data.length < total,
+      },
+    };
+  }
+
+  /**
+   * List via POST query endpoint (for proxy mode)
+   */
+  private async listViaQuery(options: ListOptions = {}): Promise<ListResult<T>> {
+    const { limit = 20, offset = 0, orderBy, orderDir, filter } = options;
+
+    // Build query body in Vibe format
+    const queryBody: {
+      page: number;
+      pageSize: number;
+      orderBy?: string;
+      orderDir?: 'asc' | 'desc';
+      filter?: Array<{ field: string; operator: string; value: unknown }>;
+    } = {
+      page: Math.floor(offset / limit) + 1,
+      pageSize: limit,
+    };
+
+    if (orderBy) {
+      queryBody.orderBy = orderBy;
+      queryBody.orderDir = orderDir || 'asc';
+    }
+
+    if (filter && Object.keys(filter).length > 0) {
+      queryBody.filter = convertFiltersToVibeFormat(filter);
+    }
+
+    const endpoint = `/v1/collections/${this.collectionName}/tables/${this.name}/query`;
+    const response = await httpRequest(this.config, endpoint, {
+      method: 'POST',
+      body: queryBody,
+    });
+
+    const body = await parseResponse<{
+      data?: T[];
+      items?: T[];
+      documents?: T[];
+      meta?: { total?: number; totalCount?: number };
+      totalCount?: number;
+    }>(response);
+
+    // Handle various response formats from Vibe
+    const data = this.unwrapDocuments(body.data || body.items || body.documents || []);
+    const total = body.meta?.total ?? body.meta?.totalCount ?? body.totalCount ?? data.length;
 
     return {
       data,
@@ -68,18 +128,20 @@ export class CollectionImpl<T> implements Collection<T> {
    * Get a single document by ID
    */
   async get(id: string | number): Promise<T | null> {
-    const url = `${this.apiUrl}/v1/${this.name}/${id}`;
+    const endpoint = this.config.useProxy
+      ? `/v1/collections/${this.collectionName}/tables/${this.name}/${id}`
+      : `/v1/${this.name}/${id}`;
 
     try {
-      const response = await this.fetch(url, { method: 'GET' });
-      const body = await this.parseResponse<{ data?: T } | T>(response);
+      const response = await httpRequest(this.config, endpoint, { method: 'GET' });
+      const body = await parseResponse<{ data?: T } | T>(response);
 
       // Handle envelope format
       if (body && typeof body === 'object' && 'data' in body) {
-        return body.data ?? null;
+        return this.unwrapDocument(body.data) ?? null;
       }
 
-      return body as T;
+      return this.unwrapDocument(body as T);
     } catch (error) {
       if (error instanceof VibeError && error.code === 'NOT_FOUND') {
         return null;
@@ -92,112 +154,99 @@ export class CollectionImpl<T> implements Collection<T> {
    * Create a new document
    */
   async create(data: Partial<T>): Promise<T> {
-    const url = `${this.apiUrl}/v1/${this.name}`;
-    const response = await this.fetch(url, {
+    const endpoint = this.config.useProxy
+      ? `/v1/collections/${this.collectionName}/tables/${this.name}`
+      : `/v1/${this.name}`;
+
+    const response = await httpRequest(this.config, endpoint, {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: data,
     });
 
-    const body = await this.parseResponse<{ data?: T } | T>(response);
+    const body = await parseResponse<{ data?: T } | T>(response);
 
     // Handle envelope format
     if (body && typeof body === 'object' && 'data' in body) {
-      return body.data as T;
+      return this.unwrapDocument(body.data) as T;
     }
 
-    return body as T;
+    return this.unwrapDocument(body as T) as T;
   }
 
   /**
    * Update an existing document
    */
   async update(id: string | number, data: Partial<T>): Promise<T> {
-    const url = `${this.apiUrl}/v1/${this.name}/${id}`;
-    const response = await this.fetch(url, {
+    const endpoint = this.config.useProxy
+      ? `/v1/collections/${this.collectionName}/tables/${this.name}/${id}`
+      : `/v1/${this.name}/${id}`;
+
+    const response = await httpRequest(this.config, endpoint, {
       method: 'PATCH',
-      body: JSON.stringify(data),
+      body: data,
     });
 
-    const body = await this.parseResponse<{ data?: T } | T>(response);
+    const body = await parseResponse<{ data?: T } | T>(response);
 
     // Handle envelope format
     if (body && typeof body === 'object' && 'data' in body) {
-      return body.data as T;
+      return this.unwrapDocument(body.data) as T;
     }
 
-    return body as T;
+    return this.unwrapDocument(body as T) as T;
   }
 
   /**
    * Delete a document
    */
   async delete(id: string | number): Promise<void> {
-    const url = `${this.apiUrl}/v1/${this.name}/${id}`;
-    await this.fetch(url, { method: 'DELETE' });
+    const endpoint = this.config.useProxy
+      ? `/v1/collections/${this.collectionName}/tables/${this.name}/${id}`
+      : `/v1/${this.name}/${id}`;
+
+    await httpRequest(this.config, endpoint, { method: 'DELETE' });
   }
 
   /**
-   * Internal fetch wrapper with auth and error handling
+   * Unwrap a Vibe document from its envelope format.
+   * Vibe returns documents with metadata where data may be a JSON string.
    */
-  private async fetch(url: string, options: RequestInit): Promise<Response> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>),
-    };
+  private unwrapDocument<D>(doc: D | null): D | null {
+    if (!doc) return null;
 
-    // Add auth token if available
-    const token = await this.getAccessToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    // Check if it's a Vibe envelope with document_id and data
+    if (
+      typeof doc === 'object' &&
+      doc !== null &&
+      'document_id' in doc &&
+      'data' in doc
+    ) {
+      const envelope = doc as { document_id: number; data: string | Record<string, unknown> };
+      let parsedData: Record<string, unknown> = {};
+
+      if (typeof envelope.data === 'string') {
+        try {
+          parsedData = JSON.parse(envelope.data);
+        } catch {
+          parsedData = {};
+        }
+      } else if (typeof envelope.data === 'object' && envelope.data !== null) {
+        parsedData = envelope.data;
+      }
+
+      return {
+        id: envelope.document_id,
+        ...parsedData,
+      } as D;
     }
 
-    // Create abort controller for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-    try {
-      if (this.debug) {
-        console.log(`[vibe] ${options.method} ${url}`);
-      }
-
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      });
-
-      if (this.debug) {
-        console.log(`[vibe] ${response.status} ${response.statusText}`);
-      }
-
-      if (!response.ok) {
-        throw await VibeError.fromResponse(response);
-      }
-
-      return response;
-    } catch (error) {
-      throw VibeError.fromError(error);
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    return doc;
   }
 
   /**
-   * Parse JSON response with error handling
+   * Unwrap an array of Vibe documents
    */
-  private async parseResponse<R>(response: Response): Promise<R> {
-    try {
-      const text = await response.text();
-      if (!text) {
-        return {} as R;
-      }
-      return JSON.parse(text);
-    } catch {
-      throw new VibeError({
-        code: 'SERVER_ERROR',
-        message: 'Invalid JSON response from server',
-        status: response.status,
-      });
-    }
+  private unwrapDocuments(docs: unknown[]): T[] {
+    return docs.map((doc) => this.unwrapDocument(doc as T)).filter((d): d is T => d !== null);
   }
 }

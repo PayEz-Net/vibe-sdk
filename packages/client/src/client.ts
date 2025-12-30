@@ -8,36 +8,74 @@ import type { VibeClient, VibeClientConfig, Collection } from './types';
 import { CollectionImpl } from './collection';
 import { AdminClientImpl } from './admin';
 
-// Default configuration values
-const DEFAULT_CONFIG: Required<VibeClientConfig> = {
-  apiUrl: '',
-  getAccessToken: async () => null,
-  debug: false,
-  timeout: 30000,
-};
+// Internal resolved config type with all fields required
+export interface ResolvedVibeConfig {
+  apiUrl: string;
+  idpUrl: string;
+  clientId: string;
+  signingKey: string;
+  defaultCollection: string;
+  getAccessToken: () => Promise<string | null>;
+  debug: boolean;
+  timeout: number;
+  /** True if using IDP proxy mode (idpUrl is set) */
+  useProxy: boolean;
+}
 
 /**
  * Resolve configuration with defaults and environment variables
  */
-function resolveConfig(config?: VibeClientConfig): Required<VibeClientConfig> {
-  // Get API URL from config or environment
-  const apiUrl =
-    config?.apiUrl ||
-    (typeof process !== 'undefined' ? process.env.VIBE_API_URL : undefined) ||
-    (typeof process !== 'undefined' ? process.env.NEXT_PUBLIC_VIBE_API_URL : undefined) ||
-    '';
+export function resolveConfig(config?: VibeClientConfig): ResolvedVibeConfig {
+  const getEnv = (key: string): string | undefined => {
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[key];
+    }
+    return undefined;
+  };
 
-  if (!apiUrl) {
+  // IDP Proxy config
+  const idpUrl = (
+    config?.idpUrl ||
+    getEnv('IDP_URL') ||
+    getEnv('NEXT_PUBLIC_IDP_URL') ||
+    ''
+  ).replace(/\/$/, '');
+
+  const clientId = config?.clientId || getEnv('VIBE_CLIENT_ID') || '';
+  const signingKey = config?.signingKey || getEnv('VIBE_HMAC_KEY') || '';
+  const defaultCollection = config?.defaultCollection || getEnv('VIBE_COLLECTION') || 'vibe_app';
+
+  // Direct Vibe URL (fallback when not using proxy)
+  const apiUrl = (
+    config?.apiUrl ||
+    getEnv('VIBE_API_URL') ||
+    getEnv('NEXT_PUBLIC_VIBE_API_URL') ||
+    ''
+  ).replace(/\/$/, '');
+
+  // Determine mode: proxy if idpUrl is set, otherwise direct
+  const useProxy = !!idpUrl;
+
+  if (!useProxy && !apiUrl) {
     console.warn(
-      '[vibe] No API URL configured. Set VIBE_API_URL environment variable or pass apiUrl to createVibeClient().'
+      '[vibe] No API URL configured. Set IDP_URL for proxy mode or VIBE_API_URL for direct mode.'
     );
   }
 
+  if (useProxy && !clientId) {
+    console.warn('[vibe] IDP proxy mode requires VIBE_CLIENT_ID to be set.');
+  }
+
   return {
-    apiUrl: apiUrl.replace(/\/$/, ''), // Remove trailing slash
-    getAccessToken: config?.getAccessToken || DEFAULT_CONFIG.getAccessToken,
-    debug: config?.debug ?? DEFAULT_CONFIG.debug,
-    timeout: config?.timeout ?? DEFAULT_CONFIG.timeout,
+    apiUrl,
+    idpUrl,
+    clientId,
+    signingKey,
+    defaultCollection,
+    getAccessToken: config?.getAccessToken || (async () => null),
+    debug: config?.debug ?? false,
+    timeout: config?.timeout ?? 30000,
+    useProxy,
   };
 }
 
@@ -45,12 +83,12 @@ function resolveConfig(config?: VibeClientConfig): Required<VibeClientConfig> {
  * Internal client implementation
  */
 class VibeClientImpl implements VibeClient {
-  private readonly config: Required<VibeClientConfig>;
+  private readonly config: ResolvedVibeConfig;
   private readonly collections: Map<string, Collection<unknown>> = new Map();
 
   readonly admin: AdminClientImpl;
 
-  constructor(config: Required<VibeClientConfig>) {
+  constructor(config: ResolvedVibeConfig) {
     this.config = config;
     this.admin = new AdminClientImpl(config);
   }

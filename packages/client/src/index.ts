@@ -37,7 +37,11 @@
  */
 
 // Core client
-export { createVibeClient, getVibeClient } from './client';
+export { createVibeClient, getVibeClient, resolveConfig } from './client';
+export type { ResolvedVibeConfig } from './client';
+
+// HTTP utilities (for advanced use cases)
+export { convertFiltersToVibeFormat } from './http';
 
 // Error handling
 export { VibeError } from './error';

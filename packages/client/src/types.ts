@@ -9,8 +9,20 @@
 // =============================================================================
 
 export interface VibeClientConfig {
-  /** Vibe API URL. Default: process.env.VIBE_API_URL */
+  /** Vibe API URL for direct mode. Default: process.env.VIBE_API_URL */
   apiUrl?: string;
+
+  /** IDP Proxy URL. When set, all requests route through IDP proxy. Default: process.env.IDP_URL */
+  idpUrl?: string;
+
+  /** Vibe Client ID for IDP proxy auth. Default: process.env.VIBE_CLIENT_ID */
+  clientId?: string;
+
+  /** HMAC signing key (base64 encoded) for IDP proxy. Default: process.env.VIBE_HMAC_KEY */
+  signingKey?: string;
+
+  /** Default collection name. Default: process.env.VIBE_COLLECTION or 'vibe_app' */
+  defaultCollection?: string;
 
   /** Function to get access token for authenticated requests */
   getAccessToken?: () => Promise<string | null>;
