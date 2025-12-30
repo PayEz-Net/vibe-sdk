@@ -12,19 +12,22 @@ import type { VibePluginOptions, TypeGenerationResult } from './types';
 const DEFAULT_OUTPUT_DIR = 'node_modules/.vibe/types';
 
 interface GeneratorOptions {
-  apiUrl: string;
+  idpUrl: string;
   clientId: string;
-  clientSecret: string;
+  signingKey: string;
   outputDir: string;
   collections?: string[];
   debug: boolean;
+  // Legacy (deprecated)
+  apiUrl?: string;
+  clientSecret?: string;
 }
 
 /**
  * Generate TypeScript types for all (or specified) Vibe collections
  */
 export async function generateTypes(options: GeneratorOptions): Promise<TypeGenerationResult> {
-  const { apiUrl, clientId, clientSecret, outputDir, collections: specifiedCollections, debug } =
+  const { idpUrl, clientId, signingKey, outputDir, collections: specifiedCollections, debug, apiUrl, clientSecret } =
     options;
 
   try {
@@ -35,12 +38,15 @@ export async function generateTypes(options: GeneratorOptions): Promise<TypeGene
 
     fs.mkdirSync(absoluteOutputDir, { recursive: true });
 
+    // Fetch options for schema fetcher
+    const fetchOptions = { idpUrl, clientId, signingKey, debug, apiUrl, clientSecret };
+
     // Fetch collections to generate types for
     let collections: string[];
     if (specifiedCollections && specifiedCollections.length > 0) {
       collections = specifiedCollections;
     } else {
-      collections = await fetchCollections({ apiUrl, clientId, clientSecret, debug });
+      collections = await fetchCollections(fetchOptions);
     }
 
     if (debug) {
@@ -53,12 +59,7 @@ export async function generateTypes(options: GeneratorOptions): Promise<TypeGene
 
     for (const collection of collections) {
       try {
-        const types = await fetchCollectionTypes(collection, {
-          apiUrl,
-          clientId,
-          clientSecret,
-          debug,
-        });
+        const types = await fetchCollectionTypes(collection, fetchOptions);
 
         // Write individual collection type file
         const fileName = `${collection}.d.ts`;
@@ -177,26 +178,44 @@ declare module '@vibe/client' {
  * Resolve generator options from plugin options and environment
  */
 export function resolveGeneratorOptions(options: VibePluginOptions): GeneratorOptions {
-  const apiUrl =
-    options.apiUrl ||
-    process.env.VIBE_API_URL ||
-    process.env.NEXT_PUBLIC_VIBE_API_URL ||
+  // IDP Proxy URL (preferred)
+  const idpUrl =
+    options.idpUrl ||
+    process.env.IDP_URL ||
+    process.env.NEXT_PUBLIC_IDP_URL ||
     '';
 
+  // Vibe Client ID
   const clientId =
     options.clientId ||
     process.env.VIBE_CLIENT_ID ||
     process.env.NEXT_PUBLIC_VIBE_CLIENT_ID ||
     '';
 
+  // Vibe HMAC Signing Key
+  const signingKey =
+    options.signingKey ||
+    process.env.VIBE_HMAC_KEY ||
+    process.env.IDP_SIGNING_KEY ||  // legacy
+    '';
+
+  // Legacy: Direct API URL (deprecated, use idpUrl instead)
+  const apiUrl =
+    options.apiUrl ||
+    process.env.VIBE_API_URL ||
+    process.env.NEXT_PUBLIC_VIBE_API_URL ||
+    '';
+
+  // Legacy: Client secret (deprecated, handled by IDP proxy)
   const clientSecret = options.clientSecret || process.env.VIBE_CLIENT_SECRET || '';
 
   const outputDir = options.outputDir || DEFAULT_OUTPUT_DIR;
   const debug = options.debug ?? false;
 
-  if (!apiUrl) {
+  // Prefer IDP proxy, fall back to direct API
+  if (!idpUrl && !apiUrl) {
     console.warn(
-      '[vibe-plugin] VIBE_API_URL not set. Type generation will fail. Set VIBE_API_URL environment variable.'
+      '[vibe-plugin] No API configuration. Set IDP_URL (preferred) or VIBE_API_URL environment variable.'
     );
   }
 
@@ -206,12 +225,21 @@ export function resolveGeneratorOptions(options: VibePluginOptions): GeneratorOp
     );
   }
 
+  if (idpUrl && !signingKey) {
+    console.warn(
+      '[vibe-plugin] VIBE_HMAC_KEY not set. HMAC signing disabled for IDP proxy.'
+    );
+  }
+
   return {
-    apiUrl: apiUrl.replace(/\/$/, ''),
+    idpUrl: idpUrl.replace(/\/$/, ''),
     clientId,
-    clientSecret,
+    signingKey,
     outputDir,
     collections: options.collections,
     debug,
+    // Legacy
+    apiUrl: apiUrl.replace(/\/$/, ''),
+    clientSecret,
   };
 }

@@ -5,13 +5,19 @@
 import type { NextConfig } from 'next';
 
 export interface VibePluginOptions {
-  /** Vibe API URL. Default: process.env.VIBE_API_URL */
-  apiUrl?: string;
+  /** IDP URL for proxy endpoint. Default: process.env.IDP_URL */
+  idpUrl?: string;
 
-  /** Client ID for build-time auth. Default: process.env.VIBE_CLIENT_ID */
+  /** Vibe Client ID (string format: vibe_xxx). Default: process.env.VIBE_CLIENT_ID */
   clientId?: string;
 
-  /** Client secret for build-time auth. Default: process.env.VIBE_CLIENT_SECRET */
+  /** Vibe HMAC Signing Key (base64 encoded). Default: process.env.VIBE_HMAC_KEY */
+  signingKey?: string;
+
+  /** @deprecated Use idpUrl instead. Direct Vibe API URL (bypasses proxy). */
+  apiUrl?: string;
+
+  /** @deprecated Handled by IDP proxy. Client secret for direct auth. */
   clientSecret?: string;
 
   /** Output directory for generated types. Default: node_modules/.vibe/types */

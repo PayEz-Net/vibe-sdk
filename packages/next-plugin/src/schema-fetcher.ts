@@ -1,39 +1,126 @@
 /**
  * Schema Fetcher
  *
- * Fetches collection schemas from the Vibe API for type generation.
+ * Fetches collection schemas from the Vibe API via IDP Proxy for type generation.
+ * Uses HMAC-SHA256 signing for authentication.
  */
 
+import { createHmac } from 'crypto';
 import type { CollectionSchema, VibePluginOptions } from './types';
 
 interface FetchOptions {
-  apiUrl: string;
+  idpUrl: string;
   clientId: string;
-  clientSecret: string;
+  signingKey: string;
   debug: boolean;
+  // Legacy direct API (deprecated)
+  apiUrl?: string;
+  clientSecret?: string;
+}
+
+/**
+ * Generate HMAC-SHA256 signature for request authentication
+ */
+function generateHmacSignature(
+  signingKey: string,
+  timestamp: number,
+  method: string,
+  endpoint: string
+): string {
+  const stringToSign = `${timestamp}|${method}|${endpoint}`;
+  const signature = createHmac('sha256', Buffer.from(signingKey, 'base64'))
+    .update(stringToSign)
+    .digest('base64');
+  return signature;
+}
+
+/**
+ * Make a request through the IDP Vibe Proxy
+ */
+async function proxyRequest(
+  endpoint: string,
+  method: 'GET' | 'POST',
+  options: FetchOptions
+): Promise<Response> {
+  const { idpUrl, clientId, signingKey, debug } = options;
+
+  const proxyUrl = `${idpUrl}/api/vibe/proxy`;
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Vibe-Client-Id': clientId,
+  };
+
+  // Add HMAC signature if signing key is configured
+  if (signingKey) {
+    const signature = generateHmacSignature(signingKey, timestamp, method, endpoint);
+    headers['X-Vibe-Timestamp'] = String(timestamp);
+    headers['X-Vibe-Signature'] = signature;
+  }
+
+  const body = {
+    endpoint,
+    method,
+    data: null,
+  };
+
+  if (debug) {
+    console.log(`[vibe-plugin] Proxy request: ${method} ${endpoint}`);
+  }
+
+  return fetch(proxyUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Legacy: Make a direct request to Vibe API (deprecated, use proxy instead)
+ */
+async function directRequest(
+  url: string,
+  options: FetchOptions
+): Promise<Response> {
+  const { clientId, clientSecret, debug } = options;
+
+  if (debug) {
+    console.log(`[vibe-plugin] Direct request (deprecated): GET ${url}`);
+  }
+
+  return fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Vibe-Client-Id': clientId,
+      'X-Vibe-Client-Secret': clientSecret || '',
+    },
+  });
 }
 
 /**
  * Fetch all available collections from the Vibe API
  */
 export async function fetchCollections(options: FetchOptions): Promise<string[]> {
-  const { apiUrl, clientId, clientSecret, debug } = options;
+  const { idpUrl, apiUrl, debug } = options;
 
-  const url = `${apiUrl}/v1/collections`;
-
-  if (debug) {
-    console.log(`[vibe-plugin] Fetching collections from ${url}`);
-  }
+  const endpoint = '/v1/collections';
 
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Vibe-Client-Id': clientId,
-        'X-Vibe-Client-Secret': clientSecret,
-      },
-    });
+    let response: Response;
+
+    // Use IDP proxy if configured, otherwise fall back to direct API
+    if (idpUrl) {
+      response = await proxyRequest(endpoint, 'GET', options);
+    } else if (apiUrl) {
+      if (debug) {
+        console.warn('[vibe-plugin] Using deprecated direct API. Configure idpUrl for IDP proxy.');
+      }
+      response = await directRequest(`${apiUrl}${endpoint}`, options);
+    } else {
+      throw new Error('No API configuration. Set IDP_URL or VIBE_API_URL.');
+    }
 
     if (!response.ok) {
       throw new Error(`Failed to fetch collections: ${response.status} ${response.statusText}`);
@@ -41,17 +128,15 @@ export async function fetchCollections(options: FetchOptions): Promise<string[]>
 
     const body = await response.json();
 
-    // Handle various response formats
-    if (Array.isArray(body)) {
-      return body.map((c: any) => c.name || c);
+    // Handle various response formats (proxy wraps response)
+    const data = body?.data ?? body;
+
+    if (Array.isArray(data)) {
+      return data.map((c: any) => c.name || c);
     }
 
-    if (body.data?.collections) {
-      return body.data.collections.map((c: any) => c.name || c);
-    }
-
-    if (body.collections) {
-      return body.collections.map((c: any) => c.name || c);
+    if (data?.collections) {
+      return data.collections.map((c: any) => c.name || c);
     }
 
     if (debug) {
@@ -77,23 +162,24 @@ export async function fetchCollectionTypes(
   collection: string,
   options: FetchOptions
 ): Promise<string> {
-  const { apiUrl, clientId, clientSecret, debug } = options;
+  const { idpUrl, apiUrl, debug } = options;
 
-  const url = `${apiUrl}/v1/schemas/${collection}/typescript`;
-
-  if (debug) {
-    console.log(`[vibe-plugin] Fetching types for ${collection} from ${url}`);
-  }
+  const endpoint = `/v1/schemas/${collection}/typescript`;
 
   try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Vibe-Client-Id': clientId,
-        'X-Vibe-Client-Secret': clientSecret,
-      },
-    });
+    let response: Response;
+
+    // Use IDP proxy if configured, otherwise fall back to direct API
+    if (idpUrl) {
+      response = await proxyRequest(endpoint, 'GET', options);
+    } else if (apiUrl) {
+      if (debug) {
+        console.warn('[vibe-plugin] Using deprecated direct API. Configure idpUrl for IDP proxy.');
+      }
+      response = await directRequest(`${apiUrl}${endpoint}`, options);
+    } else {
+      throw new Error('No API configuration. Set IDP_URL or VIBE_API_URL.');
+    }
 
     if (!response.ok) {
       // If typescript endpoint doesn't exist, try to get JSON schema and convert
@@ -112,19 +198,16 @@ export async function fetchCollectionTypes(
       return response.text();
     }
 
-    // If JSON, extract the typescript content
+    // If JSON, extract the typescript content (proxy wraps response)
     const body = await response.json();
+    const data = body?.data ?? body;
 
-    if (typeof body === 'string') {
-      return body;
+    if (typeof data === 'string') {
+      return data;
     }
 
-    if (body.typescript) {
-      return body.typescript;
-    }
-
-    if (body.data?.typescript) {
-      return body.data.typescript;
+    if (data?.typescript) {
+      return data.typescript;
     }
 
     throw new Error(`Unexpected response format for ${collection} types`);
@@ -143,22 +226,23 @@ async function fetchAndConvertSchema(
   collection: string,
   options: FetchOptions
 ): Promise<string> {
-  const { apiUrl, clientId, clientSecret, debug } = options;
+  const { idpUrl, apiUrl, debug } = options;
 
-  const url = `${apiUrl}/v1/schemas/${collection}`;
+  const endpoint = `/v1/schemas/${collection}`;
 
   if (debug) {
     console.log(`[vibe-plugin] Falling back to JSON schema for ${collection}`);
   }
 
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Vibe-Client-Id': clientId,
-      'X-Vibe-Client-Secret': clientSecret,
-    },
-  });
+  let response: Response;
+
+  if (idpUrl) {
+    response = await proxyRequest(endpoint, 'GET', options);
+  } else if (apiUrl) {
+    response = await directRequest(`${apiUrl}${endpoint}`, options);
+  } else {
+    throw new Error('No API configuration. Set IDP_URL or VIBE_API_URL.');
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -166,7 +250,8 @@ async function fetchAndConvertSchema(
     );
   }
 
-  const schema = await response.json();
+  const body = await response.json();
+  const schema = body?.data ?? body;
 
   return schemaToTypeScript(collection, schema);
 }

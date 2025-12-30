@@ -107,22 +107,56 @@ async function syncTypes(options: VibePluginOptions, checkForChanges = false): P
  * Fetch a hash of the current schema state for change detection
  */
 async function fetchSchemaHash(options: {
-  apiUrl: string;
+  idpUrl: string;
   clientId: string;
-  clientSecret: string;
+  signingKey: string;
+  apiUrl?: string;
+  clientSecret?: string;
 }): Promise<string> {
   try {
-    const response = await fetch(`${options.apiUrl}/v1/schemas/hash`, {
-      method: 'GET',
-      headers: {
+    const endpoint = '/v1/schemas/hash';
+    let response: Response;
+
+    // Use IDP proxy if configured
+    if (options.idpUrl) {
+      const { createHmac } = await import('crypto');
+      const timestamp = Math.floor(Date.now() / 1000);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
         'X-Vibe-Client-Id': options.clientId,
-        'X-Vibe-Client-Secret': options.clientSecret,
-      },
-    });
+      };
+
+      if (options.signingKey) {
+        const stringToSign = `${timestamp}|GET|${endpoint}`;
+        const signature = createHmac('sha256', Buffer.from(options.signingKey, 'base64'))
+          .update(stringToSign)
+          .digest('base64');
+        headers['X-Vibe-Timestamp'] = String(timestamp);
+        headers['X-Vibe-Signature'] = signature;
+      }
+
+      response = await fetch(`${options.idpUrl}/api/vibe/proxy`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ endpoint, method: 'GET', data: null }),
+      });
+    } else if (options.apiUrl) {
+      // Legacy direct API
+      response = await fetch(`${options.apiUrl}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          'X-Vibe-Client-Id': options.clientId,
+          'X-Vibe-Client-Secret': options.clientSecret || '',
+        },
+      });
+    } else {
+      return String(Date.now());
+    }
 
     if (response.ok) {
       const body = await response.json() as { hash?: string; data?: { hash?: string } };
-      return body.hash || body.data?.hash || String(Date.now());
+      const data = (body as any)?.data ?? body;
+      return data?.hash || String(Date.now());
     }
   } catch {
     // Fallback to timestamp-based hash if endpoint doesn't exist
