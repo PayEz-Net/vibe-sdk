@@ -42,7 +42,7 @@ export function resolveConfig(config?: VibeClientConfig): ResolvedVibeConfig {
   ).replace(/\/$/, '');
 
   const clientId = config?.clientId || getEnv('VIBE_CLIENT_ID') || '';
-  const signingKey = config?.signingKey || getEnv('VIBE_HMAC_KEY') || '';
+  const signingKey = config?.signingKey || getEnv('VIBE_HMAC_KEY') || getEnv('VIBE_APP_SIGNING_KEY') || '';
   const defaultCollection = config?.defaultCollection || getEnv('VIBE_COLLECTION') || 'vibe_app';
 
   // Direct Vibe URL (fallback when not using proxy)
