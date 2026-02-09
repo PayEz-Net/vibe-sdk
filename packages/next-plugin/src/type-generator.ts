@@ -73,7 +73,11 @@ export async function generateTypes(options: GeneratorOptions): Promise<TypeGene
         collectionTypes.push(types);
         collectionExports.push(`export * from './${collection}';`);
       } catch (error) {
-        console.warn(`[vibe-plugin] Failed to generate types for ${collection}:`, error);
+        // 401 is expected when not authenticated - stay silent
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        if (!errorMsg.includes('401')) {
+          console.warn(`[vibe-plugin] Failed to generate types for ${collection}:`, error);
+        }
       }
     }
 

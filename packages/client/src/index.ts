@@ -46,6 +46,25 @@ export { convertFiltersToVibeFormat } from './http';
 // Error handling
 export { VibeError } from './error';
 
+// Auth utilities
+export {
+  VibeRoles,
+  GlobalRoles,
+  AppRoles,
+  ADMIN_ROLES,
+  PLATFORM_ADMIN_ROLES,
+  CLIENT_ADMIN_ROLES,
+  ROLE_HIERARCHY,
+  hasRole,
+  hasAnyRole,
+  hasAllRoles,
+  isAdmin,
+  isPlatformAdmin,
+  isClientAdmin,
+  getHighestRoleLevel,
+  meetsRoleLevel,
+} from './auth';
+
 // Types
 export type {
   VibeClient,

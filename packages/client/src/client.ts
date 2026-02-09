@@ -42,7 +42,7 @@ export function resolveConfig(config?: VibeClientConfig): ResolvedVibeConfig {
   ).replace(/\/$/, '');
 
   const clientId = config?.clientId || getEnv('VIBE_CLIENT_ID') || '';
-  const signingKey = config?.signingKey || getEnv('VIBE_HMAC_KEY') || getEnv('VIBE_APP_SIGNING_KEY') || '';
+  const signingKey = config?.signingKey || getEnv('VIBE_HMAC_KEY') || '';
   const defaultCollection = config?.defaultCollection || getEnv('VIBE_COLLECTION') || 'vibe_app';
 
   // Direct Vibe URL (fallback when not using proxy)
@@ -64,6 +64,16 @@ export function resolveConfig(config?: VibeClientConfig): ResolvedVibeConfig {
 
   if (useProxy && !clientId) {
     console.warn('[vibe] IDP proxy mode requires VIBE_CLIENT_ID to be set.');
+  }
+
+  if (config?.debug) {
+    console.log('[vibe] Config resolved:', {
+      useProxy,
+      idpUrl: idpUrl ? 'set' : 'empty',
+      clientId: clientId ? 'set' : 'empty',
+      signingKey: signingKey ? 'set' : 'empty',
+      apiUrl: apiUrl ? 'set' : 'empty',
+    });
   }
 
   return {
