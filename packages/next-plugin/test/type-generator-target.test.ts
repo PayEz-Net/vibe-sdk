@@ -19,6 +19,10 @@ describe('type-generator augmentation target (PAY-2125)', () => {
     expect(out).not.toContain('@vibe/client');
   });
 
+  it("never emits the 404 package name '@vibe/next-plugin' in the generated banner", () => {
+    expect(out).not.toContain('@vibe/next-plugin');
+  });
+
   it('imports Collection from the real client', () => {
     expect(out).toContain("import type { Collection } from '@payez/vibe-client'");
   });
