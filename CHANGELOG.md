@@ -6,6 +6,18 @@ All notable changes to the Vibe SDK packages are documented here.
 
 ## @payez/vibe-client
 
+### 0.2.4 (2026-10-08)
+
+- **fix (PAY-2125)**: `list({ filter })` in proxy mode now emits Core's FLAT
+  condition for a single filter and the COMPOUND group
+  `{ operator: 'and', filters: [...] }` for several, instead of a bare array.
+  An array does not bind Core's `QueryRequest.Filter` (a `VibeFilterNode`) and
+  is refused with 400, so any filtered query was failing. The now-unused
+  `filter` key is omitted when no condition survives (previously an array was
+  always sent). Field names are passed through bare (Core maps a bare name to
+  the JSONB `data->>'name'`; a `data.` prefix is redundant for data fields and
+  wrong for document columns).
+
 ### 0.2.3 (2025-12-30)
 
 - **fix**: Support `VIBE_APP_SIGNING_KEY` as fallback env var for HMAC key
@@ -56,6 +68,15 @@ All notable changes to the Vibe SDK packages are documented here.
 
 ## @payez/vibe-next-plugin
 
+### 0.1.2 (2026-10-08)
+
+- **fix (PAY-2125)**: the generated `@vibe/types` package now augments
+  `@payez/vibe-client` (was `@vibe/client`, which does not exist on npm). A
+  consumer project that installed no `@vibe/client` got an ambient declaration
+  of a nonexistent module, so the augmentation never reached
+  `VibeClient.collection()`. Package name aligned to `@payez/vibe-next-plugin`
+  (the name it has always been published under).
+
 ### 0.1.1 (2025-12-30 -- 2026-01-10)
 
 - **fix**: Use `VIBE_HMAC_KEY` as primary env var name for HMAC signing key
@@ -67,7 +88,7 @@ All notable changes to the Vibe SDK packages are documented here.
 - **Initial release**
 - `withVibe()` and `createWithVibe()` Next.js config wrappers
 - Build-time type generation from VibeSQL schemas
-- `@vibe/types` auto-generated package with module augmentation for `@vibe/client`
+- `@vibe/types` auto-generated package with module augmentation for `@payez/vibe-client`
 - Per-collection `.d.ts` files with `Create` and `Update` type variants
 - JSON schema to TypeScript conversion fallback
 - Dev watcher with configurable poll interval (default: 10s)

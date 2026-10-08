@@ -205,19 +205,54 @@ export async function parseResponse<T>(response: Response): Promise<T> {
   }
 }
 
+/** A single leaf condition, Core's FLAT filter shape. */
+export interface VibeFilterCondition {
+  field: string;
+  operator: string;
+  value: unknown;
+}
+
 /**
- * Convert simple filter object to Vibe query filter format
+ * The filter value the query endpoint binds: one flat condition, or Core's
+ * COMPOUND group wrapping several flat conditions. `undefined` means "no
+ * condition survived" - the caller must OMIT the `filter` key rather than send
+ * an empty one.
+ */
+export type VibeFilter =
+  | VibeFilterCondition
+  | { operator: 'and' | 'or'; filters: VibeFilterCondition[] };
+
+/**
+ * Convert a simple filter object to Core's query filter format (PAY-2125).
+ *
+ * Core binds THREE filter shapes (VibeQueryBuilder.cs:156-190): the FLAT
+ * condition `{ field, operator, value }` (IsFlatFilterFormat), the COMPOUND
+ * group `{ operator: 'and'|'or', filters: [ <flat>, ... ] }`
+ * (IsCompoundFilterFormat), and the STANDARD `{ <field>: { <op>: value } }`.
+ * An ARRAY of flat conditions does NOT bind - System.Text.Json rejects it as a
+ * VibeFilterNode (400). This function therefore emits a SINGLE flat object for
+ * one condition, and the COMPOUND shape for several; it never emits an array.
+ *
+ * Field names are passed through BARE. Core maps a bare unknown name to the
+ * JSONB `data->>'name'` (GetSqlFieldExpression), exactly as it maps
+ * `data.name`, while a document column (document_id, client_id, ...) must stay
+ * bare - so a `data.` prefix is both redundant for data fields and wrong for
+ * document columns.
+ *
+ * Input:  { user_id: 'abc123' }
+ * Output: { field: 'user_id', operator: 'eq', value: 'abc123' }
  *
  * Input:  { user_id: 'abc123', status: 'active' }
- * Output: [
+ * Output: { operator: 'and', filters: [
  *   { field: 'user_id', operator: 'eq', value: 'abc123' },
- *   { field: 'status', operator: 'eq', value: 'active' }
- * ]
+ *   { field: 'status', operator: 'eq', value: 'active' },
+ * ] }
+ *
+ * Input:  {} (or every value undefined/null)
+ * Output: undefined  (caller omits `filter`)
  */
-export function convertFiltersToVibeFormat(
-  filter: Record<string, unknown>
-): Array<{ field: string; operator: string; value: unknown }> {
-  const filters: Array<{ field: string; operator: string; value: unknown }> = [];
+export function convertFiltersToVibeFormat(filter: Record<string, unknown>): VibeFilter | undefined {
+  const conditions: VibeFilterCondition[] = [];
 
   for (const [key, value] of Object.entries(filter)) {
     if (value !== undefined && value !== null) {
@@ -229,14 +264,14 @@ export function convertFiltersToVibeFormat(
         'value' in value
       ) {
         const typedValue = value as { operator: string; value: unknown };
-        filters.push({
+        conditions.push({
           field: key,
           operator: typedValue.operator,
           value: typedValue.value,
         });
       } else {
         // Simple equality filter
-        filters.push({
+        conditions.push({
           field: key,
           operator: 'eq',
           value,
@@ -245,5 +280,9 @@ export function convertFiltersToVibeFormat(
     }
   }
 
-  return filters;
+  // No condition survived: return undefined so the caller OMITS the key. An
+  // empty compound would be an unfiltered query wearing a filter's clothes.
+  if (conditions.length === 0) return undefined;
+  if (conditions.length === 1) return conditions[0];
+  return { operator: 'and', filters: conditions };
 }

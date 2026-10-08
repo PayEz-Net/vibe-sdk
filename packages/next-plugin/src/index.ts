@@ -1,12 +1,12 @@
 /**
- * @vibe/next-plugin
+ * @payez/vibe-next-plugin
  *
  * Next.js plugin for Vibe type generation.
  *
  * @example
  * ```javascript
  * // next.config.js
- * const withVibe = require('@vibe/next-plugin');
+ * const withVibe = require('@payez/vibe-next-plugin');
  *
  * module.exports = withVibe({
  *   // Your Next.js config
@@ -17,7 +17,7 @@
  * @example
  * ```javascript
  * // With custom options
- * const { createWithVibe } = require('@vibe/next-plugin');
+ * const { createWithVibe } = require('@payez/vibe-next-plugin');
  *
  * const withVibe = createWithVibe({
  *   apiUrl: 'https://vibe.example.com',

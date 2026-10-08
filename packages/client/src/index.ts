@@ -1,11 +1,11 @@
 /**
- * @vibe/client
+ * @payez/vibe-client
  *
  * Vibe data client SDK - Zero-config data access with full type safety.
  *
  * @example
  * ```typescript
- * import { createVibeClient } from '@vibe/client';
+ * import { createVibeClient } from '@payez/vibe-client';
  *
  * const vibe = createVibeClient();
  *
@@ -42,6 +42,7 @@ export type { ResolvedVibeConfig } from './client';
 
 // HTTP utilities (for advanced use cases)
 export { convertFiltersToVibeFormat } from './http';
+export type { VibeFilter, VibeFilterCondition } from './http';
 
 // Error handling
 export { VibeError } from './error';

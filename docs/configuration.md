@@ -47,7 +47,7 @@ VIBE_COLLECTION=vibe_app
 
 ```javascript
 // next.config.js
-const withVibe = require('@vibe/next-plugin');
+const withVibe = require('@payez/vibe-next-plugin');
 
 module.exports = withVibe({
   // Your Next.js config
@@ -93,7 +93,7 @@ module.exports = withVibe({
 ### Runtime Configuration
 
 ```typescript
-import { createVibeClient } from '@vibe/client';
+import { createVibeClient } from '@payez/vibe-client';
 
 const vibe = createVibeClient({
   // API URL (IDP proxy or direct)
@@ -122,7 +122,7 @@ const vibe = createVibeClient({
 ### React Provider Configuration
 
 ```typescript
-import { configureVibeClient } from '@vibe/client/react';
+import { configureVibeClient } from '@payez/vibe-client/react';
 
 configureVibeClient({
   apiUrl: process.env.NEXT_PUBLIC_IDP_URL,
@@ -379,7 +379,7 @@ npx vibe sync --debug
 
 ```javascript
 // next.config.js
-const withVibe = require('@vibe/next-plugin');
+const withVibe = require('@payez/vibe-next-plugin');
 
 module.exports = withVibe({
   reactStrictMode: true,
@@ -405,7 +405,7 @@ NEXT_PUBLIC_VIBE_CLIENT_ID=vibe_abc123
 // app/providers.tsx
 'use client';
 
-import { configureVibeClient } from '@vibe/client/react';
+import { configureVibeClient } from '@payez/vibe-client/react';
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 

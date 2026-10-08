@@ -1,5 +1,5 @@
 /**
- * @vibe/client/react
+ * @payez/vibe-client/react
  *
  * React hooks for Vibe data operations.
  * Uses TanStack Query for caching, deduplication, and state management.
@@ -8,7 +8,7 @@
  * ```typescript
  * 'use client';
  *
- * import { useVibeCollection, useVibeDocument } from '@vibe/client/react';
+ * import { useVibeCollection, useVibeDocument } from '@payez/vibe-client/react';
  *
  * function ProductList() {
  *   const { data, isLoading, error } = useVibeCollection('products', {
@@ -69,7 +69,7 @@ let clientConfig: VibeClientConfig | undefined;
  * // app/providers.tsx
  * 'use client';
  *
- * import { configureVibeClient } from '@vibe/client/react';
+ * import { configureVibeClient } from '@payez/vibe-client/react';
  * import { useSession } from 'next-auth/react';
  *
  * export function Providers({ children }) {

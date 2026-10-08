@@ -1,7 +1,7 @@
 {
-  "name": "@vibe/next-plugin",
-  "version": "0.1.1",
-  "description": "Vibe Next.js plugin - Build-time type generation for @vibe/client",
+  "name": "@payez/vibe-next-plugin",
+  "version": "0.1.2",
+  "description": "Vibe Next.js plugin - Build-time type generation for @payez/vibe-client",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
