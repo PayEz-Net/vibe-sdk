@@ -53,4 +53,34 @@ describe('schema-fetcher envelope unwrap (PAY-2129)', () => {
     stubFetch({ success: true, data: 'export interface Q {}' });
     expect(await fetchCollectionTypes('q', options)).toBe('export interface Q {}');
   });
+
+  it('fetchCollectionTypes falls back to the JSON schema and unwraps { success, data: schema }', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response('not found', { status: 404 }))
+        .mockResolvedValueOnce(
+          jsonResponse({
+            success: true,
+            data: { fields: [{ name: 'sku', type: 'string' }, { name: 'qty', type: 'integer', nullable: true }] },
+          })
+        )
+    );
+    const out = await fetchCollectionTypes('products', options);
+    expect(out).toContain('export interface Products {');
+    expect(out).toContain('sku: string;');
+    expect(out).toContain('qty?: number;');
+  });
+
+  it('fetchCollectionTypes fallback accepts an already-unwrapped schema', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response('not found', { status: 404 }))
+        .mockResolvedValueOnce(jsonResponse({ fields: [{ name: 'id', type: 'integer' }] }))
+    );
+    expect(await fetchCollectionTypes('items', options)).toContain('id: number;');
+  });
 });

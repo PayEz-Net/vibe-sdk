@@ -41,6 +41,13 @@ type CollectionsPayload = CollectionEntry[] | { collections?: CollectionEntry[] 
 /** /v1/schemas/{c}/typescript payload: .d.ts text, or { typescript }. */
 type TypesPayload = string | { typescript?: string };
 
+/** /v1/schemas/{c} payload: the fields the converter reads (array or JSON Schema map). */
+interface SchemaPayload {
+  fields?: unknown;
+  properties?: unknown;
+  required?: string[];
+}
+
 /**
  * Parse a fetch response body as an envelope-or-payload. Response.json() is
  * not typed against the real shape, so this is the one place it is asserted.
@@ -286,8 +293,8 @@ async function fetchAndConvertSchema(
     );
   }
 
-  const body = await readBody<any>(response);
-  const schema = unwrapEnvelope<any>(body);
+  const body = await readBody<SchemaPayload>(response);
+  const schema = unwrapEnvelope<SchemaPayload>(body);
 
   return schemaToTypeScript(collection, schema);
 }
