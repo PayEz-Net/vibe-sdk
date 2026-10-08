@@ -19,6 +19,42 @@ interface FetchOptions {
 }
 
 /**
+ * Core response envelope (docs/api-response-standard.md in PayEz-Core).
+ * The IDP proxy may return it wrapped, or unwrapped (payload only), so a
+ * parsed body is either an envelope around T or T itself.
+ */
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+  operation_code?: string;
+  time_stamp?: string;
+  request_id?: string;
+}
+
+type EnvelopeOrPayload<T> = ApiEnvelope<T> | T;
+
+/** /v1/collections payload: bare list, or { collections: [...] }. */
+type CollectionEntry = { name?: string } | string;
+type CollectionsPayload = CollectionEntry[] | { collections?: CollectionEntry[] };
+
+/** /v1/schemas/{c}/typescript payload: .d.ts text, or { typescript }. */
+type TypesPayload = string | { typescript?: string };
+
+/**
+ * Parse a fetch response body as an envelope-or-payload. Response.json() is
+ * not typed against the real shape, so this is the one place it is asserted.
+ */
+async function readBody<T>(response: Response): Promise<EnvelopeOrPayload<T>> {
+  return (await response.json()) as EnvelopeOrPayload<T>;
+}
+
+/** Unwrap `data` from an envelope; pass an already-unwrapped payload through. */
+function unwrapEnvelope<T>(body: EnvelopeOrPayload<T>): T {
+  return ((body as ApiEnvelope<T> | null | undefined)?.data ?? body) as T;
+}
+
+/**
  * Generate HMAC-SHA256 signature for request authentication
  */
 function generateHmacSignature(
@@ -126,10 +162,10 @@ export async function fetchCollections(options: FetchOptions): Promise<string[]>
       throw new Error(`Failed to fetch collections: ${response.status} ${response.statusText}`);
     }
 
-    const body = await response.json();
+    const body = await readBody<CollectionsPayload>(response);
 
     // Handle various response formats (proxy wraps response)
-    const data = body?.data ?? body;
+    const data = unwrapEnvelope<CollectionsPayload>(body);
 
     if (Array.isArray(data)) {
       return data.map((c: any) => c.name || c);
@@ -199,8 +235,8 @@ export async function fetchCollectionTypes(
     }
 
     // If JSON, extract the typescript content (proxy wraps response)
-    const body = await response.json();
-    const data = body?.data ?? body;
+    const body = await readBody<TypesPayload>(response);
+    const data = unwrapEnvelope<TypesPayload>(body);
 
     if (typeof data === 'string') {
       return data;
@@ -250,8 +286,8 @@ async function fetchAndConvertSchema(
     );
   }
 
-  const body = await response.json();
-  const schema = body?.data ?? body;
+  const body = await readBody<any>(response);
+  const schema = unwrapEnvelope<any>(body);
 
   return schemaToTypeScript(collection, schema);
 }
