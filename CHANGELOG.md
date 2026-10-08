@@ -79,7 +79,7 @@ All notable changes to the Vibe SDK packages are documented here.
 - **Initial release**
 - `withVibe()` and `createWithVibe()` Next.js config wrappers
 - Build-time type generation from VibeSQL schemas
-- `@vibe/types` auto-generated package with module augmentation for `@vibe/client`
+- `@vibe/types` auto-generated package with module augmentation for `@payez/vibe-client`
 - Per-collection `.d.ts` files with `Create` and `Update` type variants
 - JSON schema to TypeScript conversion fallback
 - Dev watcher with configurable poll interval (default: 10s)

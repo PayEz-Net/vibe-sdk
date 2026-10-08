@@ -87,7 +87,7 @@ export const CLIENT_ADMIN_ROLES: readonly string[] = [
  *
  * @example
  * ```typescript
- * import { hasRole, VibeRoles } from '@vibe/client';
+ * import { hasRole, VibeRoles } from '@payez/vibe-client';
  *
  * if (hasRole(user.roles, VibeRoles.VIBE_APP_ADMIN)) {
  *   // Show admin features
@@ -104,7 +104,7 @@ export function hasRole(userRoles: string[] | undefined | null, role: string): b
  *
  * @example
  * ```typescript
- * import { hasAnyRole, ADMIN_ROLES } from '@vibe/client';
+ * import { hasAnyRole, ADMIN_ROLES } from '@payez/vibe-client';
  *
  * if (hasAnyRole(user.roles, ADMIN_ROLES)) {
  *   // User has admin access
@@ -129,7 +129,7 @@ export function hasAllRoles(userRoles: string[] | undefined | null, roles: reado
  *
  * @example
  * ```typescript
- * import { isAdmin } from '@vibe/client';
+ * import { isAdmin } from '@payez/vibe-client';
  *
  * if (isAdmin(session.user.roles)) {
  *   router.push('/admin');
@@ -182,7 +182,7 @@ export function getHighestRoleLevel(userRoles: string[] | undefined | null): num
  *
  * @example
  * ```typescript
- * import { meetsRoleLevel, ROLE_HIERARCHY, VibeRoles } from '@vibe/client';
+ * import { meetsRoleLevel, ROLE_HIERARCHY, VibeRoles } from '@payez/vibe-client';
  *
  * // Check if user is at least a client admin (level 2)
  * if (meetsRoleLevel(user.roles, ROLE_HIERARCHY[VibeRoles.VIBE_CLIENT_ADMIN])) {

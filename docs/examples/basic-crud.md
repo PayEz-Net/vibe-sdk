@@ -8,7 +8,7 @@ Complete examples of Create, Read, Update, Delete operations with Vibe SDK.
 
 ```typescript
 // app/products/page.tsx
-import { createVibeClient } from '@vibe/client';
+import { createVibeClient } from '@payez/vibe-client';
 
 export default async function ProductsPage() {
   const vibe = createVibeClient();
@@ -70,7 +70,7 @@ import {
   useVibeCreate,
   useVibeUpdate,
   useVibeDelete,
-} from '@vibe/client/react';
+} from '@payez/vibe-client/react';
 import { useState } from 'react';
 
 export function ProductManager() {
@@ -266,7 +266,7 @@ import {
   useVibeCreate,
   useVibeUpdate,
   useVibeDelete,
-} from '@vibe/client/react';
+} from '@payez/vibe-client/react';
 import { useState } from 'react';
 
 export default function ProductsPage() {

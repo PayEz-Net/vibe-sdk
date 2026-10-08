@@ -15,7 +15,7 @@ Get from zero to typed queries in 5 minutes.
 ## Step 1: Install Packages
 
 ```bash
-npm install @vibe/client @vibe/next-plugin
+npm install @payez/vibe-client @vibe/next-plugin
 ```
 
 ---
@@ -62,7 +62,7 @@ Wrap your app to provide authentication:
 // app/providers.tsx
 'use client';
 
-import { configureVibeClient } from '@vibe/client/react';
+import { configureVibeClient } from '@payez/vibe-client/react';
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 
@@ -107,7 +107,7 @@ export default function RootLayout({ children }) {
 
 ```typescript
 // app/products/page.tsx
-import { createVibeClient } from '@vibe/client';
+import { createVibeClient } from '@payez/vibe-client';
 
 export default async function ProductsPage() {
   const vibe = createVibeClient();
@@ -134,7 +134,7 @@ export default async function ProductsPage() {
 // app/products/client.tsx
 'use client';
 
-import { useVibeCollection } from '@vibe/client/react';
+import { useVibeCollection } from '@payez/vibe-client/react';
 
 export function ProductList() {
   const { data: products, isLoading, error } = useVibeCollection('products');

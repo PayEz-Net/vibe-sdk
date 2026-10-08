@@ -93,7 +93,7 @@ module.exports = withVibe({
 ### Runtime Configuration
 
 ```typescript
-import { createVibeClient } from '@vibe/client';
+import { createVibeClient } from '@payez/vibe-client';
 
 const vibe = createVibeClient({
   // API URL (IDP proxy or direct)
@@ -122,7 +122,7 @@ const vibe = createVibeClient({
 ### React Provider Configuration
 
 ```typescript
-import { configureVibeClient } from '@vibe/client/react';
+import { configureVibeClient } from '@payez/vibe-client/react';
 
 configureVibeClient({
   apiUrl: process.env.NEXT_PUBLIC_IDP_URL,
@@ -405,7 +405,7 @@ NEXT_PUBLIC_VIBE_CLIENT_ID=vibe_abc123
 // app/providers.tsx
 'use client';
 
-import { configureVibeClient } from '@vibe/client/react';
+import { configureVibeClient } from '@payez/vibe-client/react';
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 

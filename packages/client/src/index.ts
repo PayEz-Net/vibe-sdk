@@ -1,11 +1,11 @@
 /**
- * @vibe/client
+ * @payez/vibe-client
  *
  * Vibe data client SDK - Zero-config data access with full type safety.
  *
  * @example
  * ```typescript
- * import { createVibeClient } from '@vibe/client';
+ * import { createVibeClient } from '@payez/vibe-client';
  *
  * const vibe = createVibeClient();
  *

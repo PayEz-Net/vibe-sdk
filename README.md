@@ -201,7 +201,7 @@ Your Next.js App
   - Per-collection .d.ts             - vibesql-server (.NET 9 + PostgreSQL)
   - VibeCollections interface        - vibesql-micro (Go + embedded PostgreSQL)
   - Type augmentation for            - Vibe Public API (hosted, HMAC auth)
-    @vibe/client
+    @payez/vibe-client
 ```
 
 **How it works:**
