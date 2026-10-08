@@ -8,6 +8,7 @@
 import type { Collection, ListOptions, ListResult } from './types';
 import type { ResolvedVibeConfig } from './client';
 import { httpRequest, parseResponse, convertFiltersToVibeFormat } from './http';
+import type { VibeFilter } from './http';
 import { VibeError } from './error';
 
 export class CollectionImpl<T> implements Collection<T> {
@@ -80,7 +81,7 @@ export class CollectionImpl<T> implements Collection<T> {
       pageSize: number;
       orderBy?: string;
       orderDir?: 'asc' | 'desc';
-      filter?: Array<{ field: string; operator: string; value: unknown }>;
+      filter?: VibeFilter;
     } = {
       page: Math.floor(offset / limit) + 1,
       pageSize: limit,
@@ -92,7 +93,12 @@ export class CollectionImpl<T> implements Collection<T> {
     }
 
     if (filter && Object.keys(filter).length > 0) {
-      queryBody.filter = convertFiltersToVibeFormat(filter);
+      // PAY-2125: convert returns undefined when nothing survives (e.g. every
+      // value null/undefined) - OMIT the key then, never send an empty filter.
+      const converted = convertFiltersToVibeFormat(filter);
+      if (converted !== undefined) {
+        queryBody.filter = converted;
+      }
     }
 
     const endpoint = `/v1/collections/${this.collectionName}/tables/${this.name}/query`;

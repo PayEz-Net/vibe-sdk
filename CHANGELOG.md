@@ -6,6 +6,18 @@ All notable changes to the Vibe SDK packages are documented here.
 
 ## @payez/vibe-client
 
+### 0.2.4 (2026-10-08)
+
+- **fix (PAY-2125)**: `list({ filter })` in proxy mode now emits Core's FLAT
+  condition for a single filter and the COMPOUND group
+  `{ operator: 'and', filters: [...] }` for several, instead of a bare array.
+  An array does not bind Core's `QueryRequest.Filter` (a `VibeFilterNode`) and
+  is refused with 400, so any filtered query was failing. The now-unused
+  `filter` key is omitted when no condition survives (previously an array was
+  always sent). Field names are passed through bare (Core maps a bare name to
+  the JSONB `data->>'name'`; a `data.` prefix is redundant for data fields and
+  wrong for document columns).
+
 ### 0.2.3 (2025-12-30)
 
 - **fix**: Support `VIBE_APP_SIGNING_KEY` as fallback env var for HMAC key
