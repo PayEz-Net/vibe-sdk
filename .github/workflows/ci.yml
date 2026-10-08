@@ -1,0 +1,39 @@
+# PAY-2131: vibe-sdk had no CI (found on PAY-2129, where the whole gate was run by hand).
+# Runs the same three commands a reviewer runs, over BOTH workspaces (packages/client, packages/next-plugin):
+#   npm ci && npm run typecheck && npm test
+# No publish step, no secrets, read-only token. A PR that breaks tsc or a test goes red here.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (lockfile-exact)
+        run: npm ci
+
+      - name: Typecheck (both workspaces)
+        run: npm run typecheck
+
+      - name: Test (both workspaces)
+        run: npm test
