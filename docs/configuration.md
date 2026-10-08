@@ -47,7 +47,7 @@ VIBE_COLLECTION=vibe_app
 
 ```javascript
 // next.config.js
-const withVibe = require('@vibe/next-plugin');
+const withVibe = require('@payez/vibe-next-plugin');
 
 module.exports = withVibe({
   // Your Next.js config
@@ -379,7 +379,7 @@ npx vibe sync --debug
 
 ```javascript
 // next.config.js
-const withVibe = require('@vibe/next-plugin');
+const withVibe = require('@payez/vibe-next-plugin');
 
 module.exports = withVibe({
   reactStrictMode: true,

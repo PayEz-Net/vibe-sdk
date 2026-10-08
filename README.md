@@ -8,7 +8,7 @@
 
 ## Features
 
-- **Auto-generated TypeScript types** -- `@vibe/next-plugin` introspects your VibeSQL schema and writes `.d.ts` files at build time. Change a column, types update automatically.
+- **Auto-generated TypeScript types** -- `@payez/vibe-next-plugin` introspects your VibeSQL schema and writes `.d.ts` files at build time. Change a column, types update automatically.
 - **Live hot-reload in dev** -- Polls your schema every 10 seconds. Add a table, types regenerate, TypeScript server reloads. No restart.
 - **Full CRUD client** -- `list`, `get`, `create`, `update`, `delete` on any collection. Pagination, filtering, and ordering built in.
 - **React hooks (TanStack Query)** -- `useVibeCollection`, `useVibeDocument`, `useVibeCreate`, `useVibeUpdate`, `useVibeDelete`. Automatic cache invalidation.

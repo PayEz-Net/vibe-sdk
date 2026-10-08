@@ -11,7 +11,7 @@
 import { generateTypes, resolveGeneratorOptions } from './type-generator';
 
 const HELP_TEXT = `
-@vibe/next-plugin CLI
+@payez/vibe-next-plugin CLI
 
 Usage:
   npx vibe <command> [options]

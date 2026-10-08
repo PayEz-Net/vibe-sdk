@@ -68,6 +68,15 @@ All notable changes to the Vibe SDK packages are documented here.
 
 ## @payez/vibe-next-plugin
 
+### 0.1.2 (2026-10-08)
+
+- **fix (PAY-2125)**: the generated `@vibe/types` package now augments
+  `@payez/vibe-client` (was `@vibe/client`, which does not exist on npm). A
+  consumer project that installed no `@vibe/client` got an ambient declaration
+  of a nonexistent module, so the augmentation never reached
+  `VibeClient.collection()`. Package name aligned to `@payez/vibe-next-plugin`
+  (the name it has always been published under).
+
 ### 0.1.1 (2025-12-30 -- 2026-01-10)
 
 - **fix**: Use `VIBE_HMAC_KEY` as primary env var name for HMAC signing key

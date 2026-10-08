@@ -6,7 +6,7 @@
  * @example
  * ```javascript
  * // next.config.js
- * const withVibe = require('@vibe/next-plugin');
+ * const withVibe = require('@payez/vibe-next-plugin');
  *
  * module.exports = withVibe({
  *   // Your Next.js config here
@@ -95,7 +95,7 @@ async function runTypeGeneration(options: VibePluginOptions, isDev: boolean): Pr
  *
  * @example
  * ```javascript
- * const withVibe = require('@vibe/next-plugin');
+ * const withVibe = require('@payez/vibe-next-plugin');
  * module.exports = withVibe({ reactStrictMode: true });
  * ```
  */

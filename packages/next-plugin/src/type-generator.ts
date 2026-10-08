@@ -120,9 +120,12 @@ export async function generateTypes(options: GeneratorOptions): Promise<TypeGene
 
 /**
  * Generate the main index.d.ts file that exports all collection types
- * and provides type augmentation for @vibe/client
+ * and provides type augmentation for @payez/vibe-client
+ *
+ * Exported so a test can pin the emitted augmentation target without a network
+ * call (PAY-2125).
  */
-function generateIndexFile(collections: string[]): string {
+export function generateIndexFile(collections: string[]): string {
   const pascalCase = (str: string) =>
     str
       .split(/[_-]/)
@@ -150,7 +153,7 @@ function generateIndexFile(collections: string[]): string {
   // Generate VibeCollections interface for type-safe collection access
   output += `/**
  * Mapping of collection names to their types.
- * Used by @vibe/client for type inference.
+ * Used by @payez/vibe-client for type inference.
  */
 export interface VibeCollections {\n`;
 
@@ -161,13 +164,13 @@ export interface VibeCollections {\n`;
 
   output += `}\n\n`;
 
-  // Type augmentation for @vibe/client
+  // Type augmentation for @payez/vibe-client
   output += `/**
- * Type augmentation for @vibe/client
+ * Type augmentation for @payez/vibe-client
  * Enables type-safe collection access without explicit generics.
  */
-declare module '@vibe/client' {
-  import type { Collection } from '@vibe/client';
+declare module '@payez/vibe-client' {
+  import type { Collection } from '@payez/vibe-client';
 
   interface VibeClient {
     collection<K extends keyof VibeCollections>(name: K): Collection<VibeCollections[K]>;

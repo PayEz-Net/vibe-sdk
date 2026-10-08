@@ -15,7 +15,7 @@ Get from zero to typed queries in 5 minutes.
 ## Step 1: Install Packages
 
 ```bash
-npm install @payez/vibe-client @vibe/next-plugin
+npm install @payez/vibe-client @payez/vibe-next-plugin
 ```
 
 ---
@@ -26,7 +26,7 @@ Add the Vibe plugin to your `next.config.js`:
 
 ```javascript
 // next.config.js
-const withVibe = require('@vibe/next-plugin');
+const withVibe = require('@payez/vibe-next-plugin');
 
 module.exports = withVibe({
   // Your existing Next.js config
