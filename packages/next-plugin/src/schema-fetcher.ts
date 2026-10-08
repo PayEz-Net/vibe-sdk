@@ -294,7 +294,7 @@ async function fetchAndConvertSchema(
   }
 
   const body = await readBody<SchemaPayload>(response);
-  const schema = unwrapEnvelope<SchemaPayload>(body);
+  const schema = body.data;
 
   return schemaToTypeScript(collection, schema);
 }
