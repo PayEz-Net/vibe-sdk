@@ -189,4 +189,6 @@ export interface VibeErrorDetails {
   message: string;
   status?: number;
   details?: Record<string, unknown>;
+  /** Seconds the server asked us to wait (Retry-After header), when present and parseable. PAY-2140. */
+  retryAfterSeconds?: number;
 }

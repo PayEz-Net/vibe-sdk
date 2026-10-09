@@ -6,10 +6,36 @@
 
 import type { VibeErrorCode, VibeErrorDetails } from './types';
 
+/**
+ * Parse a Retry-After header value to whole seconds. RFC 9110: delta-seconds ("900") or an HTTP-date.
+ * Returns undefined when absent or not parseable; a date in the past is 0 (wait no longer).
+ */
+export function parseRetryAfter(value: string | null | undefined, nowMs: number = Date.now()): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  const v = value.trim();
+  if (v === '') return undefined;
+  if (/^\d+$/.test(v)) {
+    const n = Number(v);
+    return Number.isSafeInteger(n) ? n : undefined;
+  }
+  // An HTTP-date always carries a day/month NAME. Without this guard V8's lenient Date.parse reads '-5' or '1.5'
+  // as a (past) date and answers 0 - 'wait no longer' - for a header that is simply malformed.
+  if (!/[A-Za-z]{3}/.test(v)) return undefined;
+  const at = Date.parse(v);
+  if (Number.isNaN(at)) return undefined;
+  return Math.max(0, Math.ceil((at - nowMs) / 1000));
+}
+
 export class VibeError extends Error {
   readonly code: VibeErrorCode;
   readonly status?: number;
   readonly details?: Record<string, unknown>;
+  /**
+   * PAY-2140: the Retry-After header of the response, in seconds (delta-seconds or an HTTP date),
+   * undefined when absent or unparseable. A 429 AUTH_BLOCKED carries the live block TTL here
+   * (PAY-2130); before this field the header was dropped and no consumer could honour it.
+   */
+  readonly retryAfterSeconds?: number;
 
   constructor(options: VibeErrorDetails) {
     super(options.message);
@@ -17,6 +43,7 @@ export class VibeError extends Error {
     this.code = options.code;
     this.status = options.status;
     this.details = options.details;
+    this.retryAfterSeconds = options.retryAfterSeconds;
 
     // Maintains proper stack trace for where error was thrown
     if (Error.captureStackTrace) {
@@ -50,6 +77,7 @@ export class VibeError extends Error {
       message,
       status: response.status,
       details,
+      retryAfterSeconds: parseRetryAfter(response.headers?.get?.('retry-after') ?? null),
     });
   }
 
@@ -137,6 +165,7 @@ export class VibeError extends Error {
       message: this.message,
       status: this.status,
       details: this.details,
+      retryAfterSeconds: this.retryAfterSeconds,
     };
   }
 }
