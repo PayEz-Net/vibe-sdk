@@ -5,6 +5,7 @@ import {
   parseRetryAfterHeader,
   resetWatcherState,
   MIN_PAUSE_MS,
+  MAX_RETRY_AFTER_MS,
   MAX_HEADERLESS_BACKOFF_MS,
   type SchemaHashResult,
   type WatcherDeps,
@@ -75,6 +76,7 @@ describe('P fetchSchemaHash classifies the answer', () => {
     const now = Date.parse('2026-10-08T12:00:00Z');
     expect(parseRetryAfterHeader('120', now)).toBe(120);
     expect(parseRetryAfterHeader('Thu, 08 Oct 2026 12:01:30 GMT', now)).toBe(90);
+    expect(parseRetryAfterHeader('Thu, 08 Oct 2026 11:00:00 GMT', now)).toBe(0); // a past date is 0, never negative
     for (const bad of ['-5', '1.5', 'soon', '', null]) expect(parseRetryAfterHeader(bad as string | null, now)).toBeUndefined();
   });
 });
@@ -108,6 +110,16 @@ describe('watcher tick', () => {
     expect(await runWatcherTick(options, T0 + MIN_PAUSE_MS - 1, deps)).toBe('paused');
     expect(fetchHash).toHaveBeenCalledTimes(1);
     expect(await runWatcherTick(options, T0 + MIN_PAUSE_MS, deps)).not.toBe('paused');
+  });
+
+  it('R: a huge Retry-After is capped at 1 h (a misconfigured header cannot park the watcher for a day)', async () => {
+    const { fetchHash, deps } = makeDeps([{ kind: 'rate-limited', retryAfterSeconds: 86_400 }, { kind: 'hash', hash: 'h' }]);
+    await runWatcherTick(options, T0, deps);
+    expect(MAX_RETRY_AFTER_MS).toBe(3_600_000); // the literal 1 h: a constant edit must not pass silently
+    expect(await runWatcherTick(options, T0 + MAX_RETRY_AFTER_MS - 1, deps)).toBe('paused');
+    expect(fetchHash).toHaveBeenCalledTimes(1);
+    expect(await runWatcherTick(options, T0 + MAX_RETRY_AFTER_MS, deps)).not.toBe('paused');
+    expect(fetchHash).toHaveBeenCalledTimes(2);
   });
 
   it('H: no header -> 20 s, 40 s, 80 s ... never above 900 s; a good answer resets it', async () => {
