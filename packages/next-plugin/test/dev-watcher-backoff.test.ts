@@ -115,6 +115,7 @@ describe('watcher tick', () => {
   it('R: a huge Retry-After is capped at 1 h (a misconfigured header cannot park the watcher for a day)', async () => {
     const { fetchHash, deps } = makeDeps([{ kind: 'rate-limited', retryAfterSeconds: 86_400 }, { kind: 'hash', hash: 'h' }]);
     await runWatcherTick(options, T0, deps);
+    expect(MAX_RETRY_AFTER_MS).toBe(3_600_000); // the literal 1 h: a constant edit must not pass silently
     expect(await runWatcherTick(options, T0 + MAX_RETRY_AFTER_MS - 1, deps)).toBe('paused');
     expect(fetchHash).toHaveBeenCalledTimes(1);
     expect(await runWatcherTick(options, T0 + MAX_RETRY_AFTER_MS, deps)).not.toBe('paused');
