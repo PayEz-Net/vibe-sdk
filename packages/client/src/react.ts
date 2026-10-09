@@ -40,6 +40,7 @@ import {
 } from '@tanstack/react-query';
 import { createVibeClient } from './client';
 import { VibeError } from './error';
+import { vibeRetry } from './retry';
 import type {
   ListOptions,
   Pagination,
@@ -159,6 +160,7 @@ export function useVibeCollection<T = unknown>(
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.list(collection, listOptions),
     queryFn: async () => {
       const result = await client.collection<T>(collection).list(listOptions);
@@ -214,6 +216,7 @@ export function useVibeDocument<T = unknown>(
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.detail(collection, id ?? ''),
     queryFn: async () => {
       if (id === null) return null;
@@ -397,6 +400,7 @@ export function useVibeRoles(options: ListOptions = {}): UseVibeCollectionResult
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.roles(),
     queryFn: async () => client.admin.roles.list(options),
   });
@@ -419,6 +423,7 @@ export function useVibeRole(id: number): UseVibeDocumentResult<Role> {
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.role(id),
     queryFn: async () => client.admin.roles.get(id),
   });
@@ -519,6 +524,7 @@ export function useVibeUsers(options: ListOptions = {}): UseVibeCollectionResult
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.users(),
     queryFn: async () => client.admin.users.list(options),
   });
@@ -541,6 +547,7 @@ export function useVibeUser(id: string): UseVibeDocumentResult<User> {
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.user(id),
     queryFn: async () => client.admin.users.get(id),
   });
@@ -562,6 +569,7 @@ export function useVibeUserRoles(userId: string): UseVibeCollectionResult<Role> 
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.userRoles(userId),
     queryFn: async () => {
       const roles = await client.admin.users.getRoles(userId);
@@ -590,6 +598,7 @@ export function useVibeTenantConfig(): UseVibeDocumentResult<TenantConfig> {
   const client = getClient();
 
   const query = useQuery({
+    retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
     queryKey: vibeKeys.tenant(),
     queryFn: async () => client.admin.tenant.getConfig(),
   });

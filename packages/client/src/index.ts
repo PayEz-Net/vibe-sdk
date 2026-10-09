@@ -45,7 +45,8 @@ export { convertFiltersToVibeFormat } from './http';
 export type { VibeFilter, VibeFilterCondition } from './http';
 
 // Error handling
-export { VibeError } from './error';
+export { VibeError, parseRetryAfter } from './error';
+export { vibeRetry, VIBE_DEFAULT_RETRIES } from './retry';
 
 // Auth utilities
 export {
