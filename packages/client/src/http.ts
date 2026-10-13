@@ -107,7 +107,10 @@ export async function httpRequest(
 
     return response;
   } catch (error) {
-    throw VibeError.fromError(error);
+    const e = VibeError.fromError(error);
+    // PAY-2317: a 401 means the token we sent is no good; do not reuse the memoised one on the next call.
+    if (e.code === 'UNAUTHORIZED') config.invalidateAccessToken?.();
+    throw e;
   } finally {
     clearTimeout(timeoutId);
   }

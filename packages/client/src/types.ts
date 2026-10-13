@@ -1,3 +1,4 @@
+import type { TokenResult } from './token-cache';
 /**
  * Vibe Client Types
  *
@@ -24,8 +25,18 @@ export interface VibeClientConfig {
   /** Default collection name. Default: process.env.VIBE_COLLECTION or 'vibe_app' */
   defaultCollection?: string;
 
-  /** Function to get access token for authenticated requests */
-  getAccessToken?: () => Promise<string | null>;
+  /**
+   * Function to get access token for authenticated requests. May return the bare token, or `{ token, expiresIn }` (seconds, an OAuth
+   * `expires_in`) so the SDK never reuses a token past its life. Concurrent calls share one read and a result is reused for
+   * `tokenCacheMs` (0.3.1).
+   */
+  getAccessToken?: () => Promise<string | null | TokenResult>;
+
+  /**
+   * ms an access token may be reused between calls (and the window in which concurrent calls share one `getAccessToken` read).
+   * Default 5000. 0 calls your getter on every request. Never longer than the token's own remaining life minus 30 s.
+   */
+  tokenCacheMs?: number;
 
   /** Enable debug logging */
   debug?: boolean;

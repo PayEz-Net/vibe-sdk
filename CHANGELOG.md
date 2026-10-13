@@ -6,6 +6,21 @@ All notable changes to the Vibe SDK packages are documented here.
 
 ## @payez/vibe-client
 
+### 0.3.1 (unreleased)
+
+- **change (PAY-2317), token getter**: `getAccessToken` is now single-flight and briefly memoised. `httpRequest` awaited it before
+  EVERY call, so a getter that does a network round trip (a session fetch) added one serial round trip per call and a
+  burst of 15 made 15. Concurrent calls now share one read, and a result is reused for `tokenCacheMs` (default 5000).
+  The reuse is bounded: never longer than the token's remaining life minus 30 s (from `expiresIn` when the getter returns
+  `{ token, expiresIn }`, else from a JWT `exp`, no network call); never for `null` or a thrown error; dropped on a 401. It is
+  capped at `tokenCacheMs` even for an hour-long token because the SDK cannot see your logout or account switch.
+  **`tokenCacheMs: 0` restores the exact pre-0.3.1 behaviour (getter on every call).** Apps whose getter must run on every
+  request (rotating per-request tokens) should set it. New exports: `createTokenCache`, `jwtExpSeconds`, `TokenResult`,
+  `AccessTokenGetter`, `TokenCache`, `DEFAULT_TOKEN_CACHE_MS`. `getAccessToken` may now also return `{ token, expiresIn }`.
+- **add (PAY-2317), proxy-mode hint**: in IDP proxy mode (`idpUrl` set) the SDK logs ONE informational line per process, outside
+  production or with `debug`, saying each call goes client -> IdP -> Vibe API (two hops). It judges no distance and makes no
+  network call. Direct mode is not recommended blindly: Enterprise routes require the proxy.
+
 ### 0.3.0 (unreleased)
 
 - **change (PAY-2317), cache defaults**: every query hook now sets `staleTime: 30000` and

@@ -44,6 +44,10 @@ export type { ResolvedVibeConfig } from './client';
 export { convertFiltersToVibeFormat } from './http';
 export type { VibeFilter, VibeFilterCondition } from './http';
 
+// Token getter helpers (0.3.1)
+export { createTokenCache, jwtExpSeconds, DEFAULT_TOKEN_CACHE_MS } from './token-cache';
+export type { TokenResult, AccessTokenGetter, TokenCache } from './token-cache';
+
 // Error handling
 export { VibeError, parseRetryAfter } from './error';
 export { vibeRetry, VIBE_DEFAULT_RETRIES, VIBE_RETRY_LIMITS, VIBE_QUERY_DEFAULTS, queryBehavior } from './retry';
