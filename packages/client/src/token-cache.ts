@@ -5,15 +5,21 @@
  * fetch), that is one extra serial round trip per call, and 15 calls in a burst make 15 of them. This wraps the getter so a burst
  * shares ONE in-flight read and a result is reused for a few seconds.
  *
+ * *** OPT-IN, DEFAULT OFF (BAPert 73841, NightHawk 73840). *** A client shared across users (ONE client created at module scope in a server
+ * whose getter reads the CURRENT request's session) would hand user A's token to user B, by the memo AND by the single-flight: a
+ * request that arrives while another user's read is in flight would join that read. So both are off unless `tokenCacheMs > 0`.
+ * A client shared across users must leave `tokenCacheMs` at 0 or be created per request; set it only on a client bound to one
+ * principal (a browser tab, a per-request client, a service account).
+ *
  * WHAT IT WILL NOT DO (each of these is a security or correctness line, not a tuning knob):
  *   - it never caches a null token or a thrown error (a signed-out state is re-read on the next call);
  *   - it never holds a token past its own life: when the getter reports `expiresIn` (seconds) or the token is a JWT with an `exp`
  *     claim, the memo is capped at (remaining life - 30 s), so a token with under 30 s left is not cached at all;
- *   - the memo is capped at `cacheMs` (default 5 s) even when the token lives for an hour, because the SDK cannot see the app's
+ *   - the memo is capped at `cacheMs` even when the token lives for an hour, because the SDK cannot see the app's
  *     logout / account switch: a long memo would keep sending the previous user's token. An app that knows better raises
  *     `tokenCacheMs` itself;
  *   - a 401 from the API drops the memo (`invalidate()`), so a revoked or rotated token is re-read on the next call;
- *   - `cacheMs: 0` disables both the memo and the single-flight: the getter runs on every call, as before 0.3.1.
+ *   - `cacheMs: 0` (the DEFAULT) disables both the memo and the single-flight: the getter runs on every call, exactly as before 0.3.1.
  */
 
 /** What a getter may return besides a bare token string: the token plus its remaining life in SECONDS (an OAuth `expires_in`). */
@@ -30,7 +36,8 @@ export interface TokenCache {
   invalidate(): void;
 }
 
-export const DEFAULT_TOKEN_CACHE_MS = 5000;
+/** OFF by default: see the header. Opt in with `tokenCacheMs` (5000 is a sensible value for a client bound to one principal). */
+export const DEFAULT_TOKEN_CACHE_MS = 0;
 /** A token is not memoised into the last 30 s of its life. */
 export const TOKEN_EXPIRY_MARGIN_MS = 30_000;
 

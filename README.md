@@ -247,7 +247,7 @@ const vibe = createVibeClient({
   signingKey: 'base64key==',             // HMAC signing key
   defaultCollection: 'vibe_app',         // Default collection name
   getAccessToken: async () => token,     // Bearer token provider; may return { token, expiresIn } (seconds)
-  tokenCacheMs: 5000,                    // reuse a token for up to this long; concurrent calls share one read (0 = call it every time)
+  tokenCacheMs: 0,                       // OPT-IN token reuse (ms); 0 = call getAccessToken every time. Never on a client shared across users
   debug: false,                          // Enable debug logging
   timeout: 30000,                        // Request timeout (ms)
 });
@@ -323,7 +323,7 @@ import {
 
 All hooks are built on [TanStack Query v5](https://tanstack.com/query). They require `@tanstack/react-query` and a `QueryClientProvider` in your tree.
 
-**Token getter (0.3.1).** `getAccessToken` is called once for a burst of concurrent requests and its result is reused for `tokenCacheMs` (default 5 s), never past the token's own life minus 30 s (read from `expiresIn` when you return `{ token, expiresIn }`, else from a JWT `exp` claim, no network call). A `null` or a thrown error is never reused, and a 401 drops the reused token. The reuse is capped short on purpose: the SDK cannot see your logout or account switch. Set `tokenCacheMs: 0` to call your getter on every request. In IDP proxy mode (`idpUrl` set) the SDK logs one informational line per process outside production (or with `debug`) saying every call takes two hops.
+**Token getter (0.3.1, opt-in).** By default `getAccessToken` is called on every request, exactly as before. Set `tokenCacheMs` (for example `5000`) and concurrent requests share ONE `getAccessToken` read and its result is reused for that long, never past the token's own life minus 30 s (read from `expiresIn` when you return `{ token, expiresIn }`, else from a JWT `exp` claim, no network call). A `null` or a thrown error is never reused, and a 401 drops the reused token. **Important: a client shared across users must leave `tokenCacheMs` at 0 or be created per request; set it only on a client bound to one principal** (a browser tab, a per-request client, a service account). A server-wide client whose getter reads the current request's session would otherwise hand one user's token to another, both from the reuse window and from the shared in-flight read. In IDP proxy mode (`idpUrl` set) the SDK logs one informational line per process outside production (or with `debug`) saying every call takes two hops.
 
 **Cache and retry defaults (0.3.0).** The query hooks set `staleTime: 30000` and `refetchOnWindowFocus: false` (a remount inside 30 s makes no new request), and retry per failure class: 429 / `TIMEOUT` / any other 4xx never, 5xx once, network errors twice. Override the cache values per hook, e.g. `useVibeCollection('products', { staleTime: 0, refetchOnWindowFocus: true })`; the admin hooks take the same two options as a trailing argument. These hook-level values take precedence over your `QueryClient` `defaultOptions`.
 

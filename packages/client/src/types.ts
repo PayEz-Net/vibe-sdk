@@ -33,8 +33,11 @@ export interface VibeClientConfig {
   getAccessToken?: () => Promise<string | null | TokenResult>;
 
   /**
-   * ms an access token may be reused between calls (and the window in which concurrent calls share one `getAccessToken` read).
-   * Default 5000. 0 calls your getter on every request. Never longer than the token's own remaining life minus 30 s.
+   * OPT-IN. ms an access token may be reused between calls, and the window in which concurrent calls share ONE `getAccessToken`
+   * read. Default 0 = your getter runs on every request, exactly as before 0.3.1. Never longer than the token's own remaining life
+   * minus 30 s. **A client shared across users must leave this at 0 or be created per request; set it only on a client bound to one
+   * principal** (a browser tab, a per-request client, a service account): a server-wide client whose getter reads the current
+   * request's session would otherwise hand one user's token to another.
    */
   tokenCacheMs?: number;
 

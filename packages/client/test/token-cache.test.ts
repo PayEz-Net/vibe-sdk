@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createTokenCache, jwtExpSeconds, memoMs, TOKEN_EXPIRY_MARGIN_MS } from '../src/token-cache';
 import { resolveConfig, resetProxyHintForTests } from '../src/client';
 import { httpRequest } from '../src/http';
@@ -24,7 +26,7 @@ describe('A single-flight', () => {
   it('15 concurrent calls with a slow getter read it ONCE; a burst after the window reads again', async () => {
     const c = clock();
     let reads = 0;
-    const cache = createTokenCache(async () => { reads++; await new Promise((r) => setTimeout(r, 20)); return 'tok'; }, { now: c.now });
+    const cache = createTokenCache(async () => { reads++; await new Promise((r) => setTimeout(r, 20)); return 'tok'; }, { cacheMs: 5000, now: c.now });
     const first = await Promise.all(Array.from({ length: 15 }, () => cache.get()));
     expect(first.every((t) => t === 'tok')).toBe(true);
     expect(reads).toBe(1);
@@ -41,7 +43,7 @@ describe('B what is never cached', () => {
   it('null is not memoised: the next call re-reads (a signed-out state is not frozen)', async () => {
     const c = clock();
     let reads = 0;
-    const cache = createTokenCache(async () => { reads++; return reads === 1 ? null : 'tok'; }, { now: c.now });
+    const cache = createTokenCache(async () => { reads++; return reads === 1 ? null : 'tok'; }, { cacheMs: 5000, now: c.now });
     expect(await cache.get()).toBeNull();
     expect(await cache.get()).toBe('tok');
     expect(reads).toBe(2);
@@ -50,7 +52,7 @@ describe('B what is never cached', () => {
   it('a thrown error reaches every waiter and is not memoised', async () => {
     const c = clock();
     let reads = 0;
-    const cache = createTokenCache(async () => { reads++; if (reads === 1) throw new Error('session fetch failed'); return 'ok'; }, { now: c.now });
+    const cache = createTokenCache(async () => { reads++; if (reads === 1) throw new Error('session fetch failed'); return 'ok'; }, { cacheMs: 5000, now: c.now });
     const both = await Promise.allSettled([cache.get(), cache.get()]);
     expect(both.map((r) => r.status)).toEqual(['rejected', 'rejected']);
     expect(reads).toBe(1);
@@ -66,7 +68,7 @@ describe('B what is never cached', () => {
       reads++;
       if (reads === 1) await new Promise<void>((r) => { release = r; });
       return `tok${reads}`;
-    }, { now: c.now });
+    }, { cacheMs: 5000, now: c.now });
     const stale = cache.get(); // read 1, parked
     cache.invalidate();
     release?.();
@@ -91,11 +93,11 @@ describe('C token lifetime caps the memo', () => {
   it('expiresIn from the getter: a 20 s token is never cached; a 3600 s token is cached only for cacheMs', async () => {
     const c = clock();
     let reads = 0;
-    const short = createTokenCache(async () => { reads++; return { token: 't', expiresIn: 20 }; }, { now: c.now });
+    const short = createTokenCache(async () => { reads++; return { token: 't', expiresIn: 20 }; }, { cacheMs: 5000, now: c.now });
     await short.get(); await short.get();
     expect(reads).toBe(2);
     reads = 0;
-    const long = createTokenCache(async () => { reads++; return { token: 't', expiresIn: 3600 }; }, { now: c.now });
+    const long = createTokenCache(async () => { reads++; return { token: 't', expiresIn: 3600 }; }, { cacheMs: 5000, now: c.now });
     await long.get(); c.advance(4_000); await long.get();
     expect(reads).toBe(1);
     c.advance(1_500); await long.get();
@@ -109,11 +111,11 @@ describe('C token lifetime caps the memo', () => {
     expect(jwtExpSeconds('not-a-jwt')).toBeUndefined();
     expect(jwtExpSeconds('a.!!!.c')).toBeUndefined();
     let reads = 0;
-    const expiring = createTokenCache(async () => { reads++; return jwt(Math.floor(nowMs / 1000) + 20); }, { now: c.now });
+    const expiring = createTokenCache(async () => { reads++; return jwt(Math.floor(nowMs / 1000) + 20); }, { cacheMs: 5000, now: c.now });
     await expiring.get(); await expiring.get();
     expect(reads).toBe(2); // 20 s of life left: not cached
     reads = 0;
-    const healthy = createTokenCache(async () => { reads++; return jwt(Math.floor(nowMs / 1000) + 600); }, { now: c.now });
+    const healthy = createTokenCache(async () => { reads++; return jwt(Math.floor(nowMs / 1000) + 600); }, { cacheMs: 5000, now: c.now });
     await healthy.get(); await healthy.get();
     expect(reads).toBe(1);
     expect(TOKEN_EXPIRY_MARGIN_MS).toBe(30_000);
@@ -143,7 +145,7 @@ describe('E http wiring', () => {
       return new Response(JSON.stringify({ error: { message: 'no' } }), { status: seen.length === 1 ? 401 : 200, headers: { 'content-type': 'application/json' } });
     }));
     let reads = 0;
-    const cfg = resolveConfig({ apiUrl: 'http://api.test', getAccessToken: async () => `tok${++reads}` });
+    const cfg = resolveConfig({ apiUrl: 'http://api.test', tokenCacheMs: 5000, getAccessToken: async () => `tok${++reads}` });
     await expect(httpRequest(cfg, '/x', { method: 'GET' })).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     await httpRequest(cfg, '/x', { method: 'GET' });
     expect(seen).toEqual(['Bearer tok1', 'Bearer tok2']); // memo dropped by the 401
@@ -155,7 +157,7 @@ describe('E http wiring', () => {
   it('a non-401 failure does NOT drop the memo', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500, headers: { 'content-type': 'application/json' } })));
     let reads = 0;
-    const cfg = resolveConfig({ apiUrl: 'http://api.test', getAccessToken: async () => `tok${++reads}` });
+    const cfg = resolveConfig({ apiUrl: 'http://api.test', tokenCacheMs: 5000, getAccessToken: async () => `tok${++reads}` });
     await expect(httpRequest(cfg, '/x', { method: 'GET' })).rejects.toMatchObject({ code: 'SERVER_ERROR' });
     await expect(httpRequest(cfg, '/x', { method: 'GET' })).rejects.toMatchObject({ code: 'SERVER_ERROR' });
     expect(reads).toBe(1);
@@ -186,5 +188,58 @@ describe('F proxy-mode hint', () => {
     expect(info).not.toHaveBeenCalled();
     resolveConfig({ idpUrl: 'http://idp.test', clientId: 'vibe_x', debug: true });
     expect(info).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('G opt-in: default OFF, and the shared-server-client leak (BAPert 73841, NightHawk 73840)', () => {
+  it('the DEFAULT is off: two sequential calls with different getter results make TWO reads and each gets its own', async () => {
+    let n = 0;
+    const cfg = resolveConfig({ apiUrl: 'http://api.test', getAccessToken: async () => `user${++n}` });
+    expect(await cfg.getAccessToken()).toBe('user1');
+    expect(await cfg.getAccessToken()).toBe('user2');
+    expect(n).toBe(2);
+  });
+
+  it('the DEFAULT also does NOT share an in-flight read: two concurrent calls make two reads', async () => {
+    let n = 0;
+    const cfg = resolveConfig({
+      apiUrl: 'http://api.test',
+      getAccessToken: async () => { const mine = `user${++n}`; await new Promise((r) => setTimeout(r, 10)); return mine; },
+    });
+    const [a, b] = await Promise.all([cfg.getAccessToken(), cfg.getAccessToken()]);
+    expect([a, b]).toEqual(['user1', 'user2']);
+  });
+
+  it('SHARED CLIENT: getter answers A then B inside the window. Memo ON -> B receives A (the documented leak); memo OFF (default) -> B receives B', async () => {
+    const principal = { current: 'A' };
+    const getter = async () => `token-of-${principal.current}`;
+    const on = resolveConfig({ apiUrl: 'http://api.test', tokenCacheMs: 5000, getAccessToken: getter });
+    principal.current = 'A';
+    await on.getAccessToken();
+    principal.current = 'B';
+    expect(await on.getAccessToken()).toBe('token-of-A'); // why a shared client must NOT opt in
+
+    const off = resolveConfig({ apiUrl: 'http://api.test', getAccessToken: getter });
+    principal.current = 'A';
+    await off.getAccessToken();
+    principal.current = 'B';
+    expect(await off.getAccessToken()).toBe('token-of-B');
+  });
+
+  it('opt-in: tokenCacheMs > 0 turns both the memo and the single-flight on', async () => {
+    let n = 0;
+    const cfg = resolveConfig({ apiUrl: 'http://api.test', tokenCacheMs: 5000, getAccessToken: async () => `t${++n}` });
+    await Promise.all([cfg.getAccessToken(), cfg.getAccessToken(), cfg.getAccessToken()]);
+    await cfg.getAccessToken();
+    expect(n).toBe(1);
+  });
+
+  it('the documented warning is in the README, the CHANGELOG and the type doc, in so many words', () => {
+    const root = join(__dirname, '..', '..', '..');
+    const needle = 'a client shared across users must leave `tokenCacheMs` at 0 or be created per request';
+    for (const f of ['README.md', 'CHANGELOG.md']) {
+      expect(readFileSync(join(root, f), 'utf8').replace(/\r\n/g, '\n').replace(/\n\s*/g, ' ').toLowerCase()).toContain(needle.toLowerCase());
+    }
+    expect(readFileSync(join(__dirname, '..', 'src', 'types.ts'), 'utf8').replace(/\r\n/g, '\n').replace(/\n\s*\*\s*/g, ' ').toLowerCase()).toContain('a client shared across users must leave this at 0 or be created per request');
   });
 });
