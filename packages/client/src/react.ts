@@ -40,7 +40,8 @@ import {
 } from '@tanstack/react-query';
 import { createVibeClient } from './client';
 import { VibeError } from './error';
-import { vibeRetry } from './retry';
+import { vibeRetry, queryBehavior } from './retry';
+import type { QueryBehavior } from './retry';
 import type {
   ListOptions,
   Pagination,
@@ -120,7 +121,7 @@ export const vibeKeys = {
 // Collection Hooks
 // =============================================================================
 
-export interface UseVibeCollectionOptions extends ListOptions {
+export interface UseVibeCollectionOptions extends ListOptions, QueryBehavior {
   /** Enable or disable the query */
   enabled?: boolean;
 }
@@ -156,11 +157,12 @@ export function useVibeCollection<T = unknown>(
   collection: string,
   options: UseVibeCollectionOptions = {}
 ): UseVibeCollectionResult<T> {
-  const { enabled = true, ...listOptions } = options;
+  const { enabled = true, staleTime, refetchOnWindowFocus, ...listOptions } = options;
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior({ staleTime, refetchOnWindowFocus }), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.list(collection, listOptions),
     queryFn: async () => {
       const result = await client.collection<T>(collection).list(listOptions);
@@ -180,7 +182,7 @@ export function useVibeCollection<T = unknown>(
   };
 }
 
-export interface UseVibeDocumentOptions {
+export interface UseVibeDocumentOptions extends QueryBehavior {
   /** Enable or disable the query */
   enabled?: boolean;
 }
@@ -212,11 +214,12 @@ export function useVibeDocument<T = unknown>(
   id: string | number | null,
   options: UseVibeDocumentOptions = {}
 ): UseVibeDocumentResult<T> {
-  const { enabled = true } = options;
+  const { enabled = true, staleTime, refetchOnWindowFocus } = options;
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior({ staleTime, refetchOnWindowFocus }), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.detail(collection, id ?? ''),
     queryFn: async () => {
       if (id === null) return null;
@@ -396,11 +399,12 @@ export function useVibeDelete(collection: string): UseVibeDeleteResult {
 /**
  * Hook to fetch roles list
  */
-export function useVibeRoles(options: ListOptions = {}): UseVibeCollectionResult<Role> {
+export function useVibeRoles(options: ListOptions = {}, behavior?: QueryBehavior): UseVibeCollectionResult<Role> {
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior(behavior), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.roles(),
     queryFn: async () => client.admin.roles.list(options),
   });
@@ -419,11 +423,12 @@ export function useVibeRoles(options: ListOptions = {}): UseVibeCollectionResult
 /**
  * Hook to fetch a single role
  */
-export function useVibeRole(id: number): UseVibeDocumentResult<Role> {
+export function useVibeRole(id: number, behavior?: QueryBehavior): UseVibeDocumentResult<Role> {
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior(behavior), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.role(id),
     queryFn: async () => client.admin.roles.get(id),
   });
@@ -520,11 +525,12 @@ export function useVibeDeleteRole(): UseVibeDeleteResult {
 /**
  * Hook to fetch users list
  */
-export function useVibeUsers(options: ListOptions = {}): UseVibeCollectionResult<User> {
+export function useVibeUsers(options: ListOptions = {}, behavior?: QueryBehavior): UseVibeCollectionResult<User> {
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior(behavior), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.users(),
     queryFn: async () => client.admin.users.list(options),
   });
@@ -543,11 +549,12 @@ export function useVibeUsers(options: ListOptions = {}): UseVibeCollectionResult
 /**
  * Hook to fetch a single user
  */
-export function useVibeUser(id: string): UseVibeDocumentResult<User> {
+export function useVibeUser(id: string, behavior?: QueryBehavior): UseVibeDocumentResult<User> {
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior(behavior), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.user(id),
     queryFn: async () => client.admin.users.get(id),
   });
@@ -565,11 +572,12 @@ export function useVibeUser(id: string): UseVibeDocumentResult<User> {
 /**
  * Hook to fetch a user's roles
  */
-export function useVibeUserRoles(userId: string): UseVibeCollectionResult<Role> {
+export function useVibeUserRoles(userId: string, behavior?: QueryBehavior): UseVibeCollectionResult<Role> {
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior(behavior), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.userRoles(userId),
     queryFn: async () => {
       const roles = await client.admin.users.getRoles(userId);
@@ -594,11 +602,12 @@ export function useVibeUserRoles(userId: string): UseVibeCollectionResult<Role> 
 /**
  * Hook to fetch tenant configuration
  */
-export function useVibeTenantConfig(): UseVibeDocumentResult<TenantConfig> {
+export function useVibeTenantConfig(behavior?: QueryBehavior): UseVibeDocumentResult<TenantConfig> {
   const client = getClient();
 
   const query = useQuery({
     retry: vibeRetry, // PAY-2140: never retry a 429/RATE_LIMITED
+    ...queryBehavior(behavior), // PAY-2317: overridable cache defaults
     queryKey: vibeKeys.tenant(),
     queryFn: async () => client.admin.tenant.getConfig(),
   });

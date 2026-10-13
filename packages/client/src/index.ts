@@ -46,7 +46,8 @@ export type { VibeFilter, VibeFilterCondition } from './http';
 
 // Error handling
 export { VibeError, parseRetryAfter } from './error';
-export { vibeRetry, VIBE_DEFAULT_RETRIES } from './retry';
+export { vibeRetry, VIBE_DEFAULT_RETRIES, VIBE_RETRY_LIMITS, VIBE_QUERY_DEFAULTS, queryBehavior } from './retry';
+export type { QueryBehavior } from './retry';
 
 // Auth utilities
 export {
