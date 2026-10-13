@@ -6,6 +6,22 @@ All notable changes to the Vibe SDK packages are documented here.
 
 ## @payez/vibe-client
 
+### 0.3.1 (unreleased)
+
+- **add (PAY-2317), token getter reuse, OPT-IN**: `httpRequest` awaits `getAccessToken()` before EVERY call, so a getter that does a
+  network round trip (a session fetch) adds one serial round trip per call. Setting `tokenCacheMs` > 0 makes concurrent calls
+  share ONE read and reuses the result for that long. **Default is 0 = no reuse and no sharing: behaviour is unchanged from
+  0.3.0.** The reuse is bounded: never longer than the token's remaining life minus 30 s (from `{ token, expiresIn }` returned by
+  the getter, else a JWT `exp`, no network call); never for `null` or a thrown error; dropped on a 401.
+  **A client shared across users must leave `tokenCacheMs` at 0 or be created per request; set it only on a client bound to one
+  principal** (a browser tab, a per-request client, a service account). On a server-wide client whose getter reads the current
+  request's session, the reuse window AND the shared in-flight read would hand user A's token to user B (found by the PAY-2317
+  gate, NightHawk 73840). New exports: `createTokenCache`, `jwtExpSeconds`, `TokenResult`, `AccessTokenGetter`, `TokenCache`,
+  `DEFAULT_TOKEN_CACHE_MS` (0). `getAccessToken` may now also return `{ token, expiresIn }`.
+- **add (PAY-2317), proxy-mode hint**: in IDP proxy mode (`idpUrl` set) the SDK logs ONE informational line per process, outside
+  production or with `debug`, saying each call goes client -> IdP -> Vibe API (two hops). It judges no distance and makes no
+  network call. Direct mode is not recommended blindly: Enterprise routes require the proxy.
+
 ### 0.3.0 (unreleased)
 
 - **change (PAY-2317), cache defaults**: every query hook now sets `staleTime: 30000` and

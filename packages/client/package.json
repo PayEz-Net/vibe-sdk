@@ -1,6 +1,6 @@
 {
   "name": "@payez/vibe-client",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Vibe data client SDK - Zero-config data access with full type safety",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

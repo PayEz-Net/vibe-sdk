@@ -7,6 +7,7 @@
 import type { VibeClient, VibeClientConfig, Collection } from './types';
 import { CollectionImpl } from './collection';
 import { AdminClientImpl } from './admin';
+import { createTokenCache, DEFAULT_TOKEN_CACHE_MS } from './token-cache';
 
 // Internal resolved config type with all fields required
 export interface ResolvedVibeConfig {
@@ -16,10 +17,36 @@ export interface ResolvedVibeConfig {
   signingKey: string;
   defaultCollection: string;
   getAccessToken: () => Promise<string | null>;
+  /** Drop the memoised token (called on a 401) so the next call re-reads the getter. */
+  invalidateAccessToken?: () => void;
   debug: boolean;
   timeout: number;
   /** True if using IDP proxy mode (idpUrl is set) */
   useProxy: boolean;
+}
+
+let proxyHintShown = false;
+
+/** Test hook: forget that the proxy-mode hint was shown. */
+export function resetProxyHintForTests(): void {
+  proxyHintShown = false;
+}
+
+/**
+ * PAY-2317 (0.3.1): ONE informational line per process when the client runs in IDP proxy mode, outside production (or with `debug`).
+ * It does not judge distance (the SDK cannot know where the app or the IdP run, and it makes no network call to find out); it states
+ * the cost so a slow app has somewhere to look. Direct mode is not recommended blindly: some Vibe routes (Enterprise) need the proxy.
+ */
+function announceProxyMode(idpUrl: string, debug: boolean): void {
+  if (proxyHintShown) return;
+  const prod = typeof process !== 'undefined' && process.env?.NODE_ENV === 'production';
+  if (prod && !debug) return;
+  proxyHintShown = true;
+  console.info(
+    `[vibe] proxy mode: every call goes client -> ${idpUrl}/api/vibe/proxy -> Vibe API (two hops). ` +
+      'If calls are slow and the IdP is far from this app, ask whether your routes can use direct mode (VIBE_API_URL without IDP_URL); ' +
+      'Enterprise routes require the proxy.'
+  );
 }
 
 /**
@@ -76,13 +103,20 @@ export function resolveConfig(config?: VibeClientConfig): ResolvedVibeConfig {
     });
   }
 
+  const tokenCache = createTokenCache(config?.getAccessToken || (async () => null), {
+    cacheMs: config?.tokenCacheMs ?? DEFAULT_TOKEN_CACHE_MS,
+  });
+
+  if (useProxy) announceProxyMode(idpUrl, config?.debug ?? false);
+
   return {
     apiUrl,
     idpUrl,
     clientId,
     signingKey,
     defaultCollection,
-    getAccessToken: config?.getAccessToken || (async () => null),
+    getAccessToken: tokenCache.get,
+    invalidateAccessToken: tokenCache.invalidate,
     debug: config?.debug ?? false,
     timeout: config?.timeout ?? 30000,
     useProxy,
