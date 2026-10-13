@@ -6,6 +6,24 @@ All notable changes to the Vibe SDK packages are documented here.
 
 ## @payez/vibe-client
 
+### 0.3.0 (unreleased)
+
+- **change (PAY-2317), cache defaults**: every query hook now sets `staleTime: 30000` and
+  `refetchOnWindowFocus: false`. TanStack's own defaults (stale at once, refetch on every mount, focus and
+  reconnect) turned one page into repeated identical calls on a slow link. Override per hook with
+  `staleTime` / `refetchOnWindowFocus` (hook options for `useVibeCollection` / `useVibeDocument`, a trailing
+  argument for the admin hooks). **Note:** a value set on the hook takes precedence over your
+  `QueryClient` `defaultOptions`; pass `{ staleTime: 0 }` to restore refetch-on-mount for one hook.
+  New exports: `VIBE_QUERY_DEFAULTS`, `queryBehavior`, `QueryBehavior`.
+- **change (PAY-2317), retry policy**: `vibeRetry` no longer retries every non-429 failure three times.
+  429 / `TIMEOUT` / any other 4xx: never (a 400/401/403/404 cannot heal; a timeout already waited the whole
+  `timeout`). 5xx: once. `NETWORK_ERROR`: twice. Anything else: once. Mutations are unchanged (no retry).
+- **fix (PAY-2317), new error code `TIMEOUT`**: an aborted request (the `timeout` option elapsed) was reported as
+  `NETWORK_ERROR`, indistinguishable from a dropped connection. It is now `TIMEOUT` and is not
+  `isRetryable()`. Code that switches on `err.code === 'NETWORK_ERROR'` to detect a timeout must also check
+  `'TIMEOUT'`.
+- Not in this release (designed on PAY-2317, later): token-getter memoisation, proxy-mode hint.
+
 ### 0.2.4 (2026-10-08)
 
 - **fix (PAY-2125)**: `list({ filter })` in proxy mode now emits Core's FLAT

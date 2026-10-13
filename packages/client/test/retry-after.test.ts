@@ -60,12 +60,13 @@ describe('B vibeRetry', () => {
     expect(vibeRetry(0, new VibeError({ code: 'UNKNOWN_ERROR', message: 'x', status: 429 }))).toBe(false);
   });
 
-  it('keeps the TanStack default for other failures: retry 3 times, then stop', () => {
+  it('PAY-2317: other failures are no longer retried 3 times (full table in query-defaults.test.ts)', () => {
     const net = new VibeError({ code: 'NETWORK_ERROR', message: 'down' });
-    expect([0, 1, 2].map((n) => vibeRetry(n, net))).toEqual([true, true, true]);
-    expect(vibeRetry(VIBE_DEFAULT_RETRIES, net)).toBe(false);
-    expect(vibeRetry(0, new VibeError({ code: 'SERVER_ERROR', message: 's', status: 500 }))).toBe(true);
+    expect([0, 1, 2].map((n) => vibeRetry(n, net))).toEqual([true, true, false]); // twice
+    const srv = new VibeError({ code: 'SERVER_ERROR', message: 's', status: 500 });
+    expect([0, 1].map((n) => vibeRetry(n, srv))).toEqual([true, false]); // once
     expect(vibeRetry(0, new Error('plain'))).toBe(true);
+    expect(VIBE_DEFAULT_RETRIES).toBe(3); // the exported ceiling is unchanged
   });
 });
 
@@ -76,6 +77,6 @@ describe('C every useQuery passes the policy', () => {
     const withPolicy = src.split('useQuery({\n    retry: vibeRetry').length - 1;
     expect(sites).toBeGreaterThan(0);
     expect(withPolicy).toBe(sites);
-    expect(src).toContain("import { vibeRetry } from './retry';");
+    expect(src).toMatch(/import \{ vibeRetry(, queryBehavior)? \} from '\.\/retry';/); // PAY-2317 adds queryBehavior to this import
   });
 });

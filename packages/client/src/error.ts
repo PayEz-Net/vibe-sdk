@@ -102,7 +102,7 @@ export class VibeError extends Error {
       // Timeout errors
       if (error.name === 'AbortError') {
         return new VibeError({
-          code: 'NETWORK_ERROR',
+          code: 'TIMEOUT',
           message: 'Request timed out',
           details: { originalError: error.message },
         });

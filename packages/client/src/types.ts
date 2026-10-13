@@ -175,6 +175,7 @@ export interface TenantConfig {
 
 export type VibeErrorCode =
   | 'NETWORK_ERROR'
+  | 'TIMEOUT'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
   | 'NOT_FOUND'

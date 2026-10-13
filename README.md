@@ -322,6 +322,8 @@ import {
 
 All hooks are built on [TanStack Query v5](https://tanstack.com/query). They require `@tanstack/react-query` and a `QueryClientProvider` in your tree.
 
+**Cache and retry defaults (0.3.0).** The query hooks set `staleTime: 30000` and `refetchOnWindowFocus: false` (a remount inside 30 s makes no new request), and retry per failure class: 429 / `TIMEOUT` / any other 4xx never, 5xx once, network errors twice. Override the cache values per hook, e.g. `useVibeCollection('products', { staleTime: 0, refetchOnWindowFocus: true })`; the admin hooks take the same two options as a trailing argument. These hook-level values take precedence over your `QueryClient` `defaultOptions`.
+
 | Hook | Purpose | Returns |
 |------|---------|---------|
 | `useVibeCollection(name, opts?)` | Paginated list query | `{ data, pagination, isLoading, error, refetch }` |
@@ -388,12 +390,12 @@ try {
     console.log(err.code);     // 'NOT_FOUND' | 'UNAUTHORIZED' | 'FORBIDDEN' | ...
     console.log(err.status);   // 404
     console.log(err.message);  // 'HTTP 404: Not Found'
-    console.log(err.isRetryable()); // false (true for NETWORK_ERROR, RATE_LIMITED, SERVER_ERROR)
+    console.log(err.isRetryable()); // false (true for NETWORK_ERROR, RATE_LIMITED, SERVER_ERROR; false for TIMEOUT)
   }
 }
 ```
 
-Error codes: `NETWORK_ERROR`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `CONFLICT`, `RATE_LIMITED`, `SERVER_ERROR`, `UNKNOWN_ERROR`.
+Error codes: `NETWORK_ERROR`, `TIMEOUT`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`, `CONFLICT`, `RATE_LIMITED`, `SERVER_ERROR`, `UNKNOWN_ERROR`.
 
 ### Filter Syntax
 
